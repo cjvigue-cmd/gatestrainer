@@ -120,6 +120,10 @@ if result.passed { /* the tests ran and passed, in the sandbox */ }
 
 Gatestrainer is the gate library of [WildSon Coureur](https://github.com/cjvigue-cmd/Coureur), a local-first engine that hands work to a local model and lets gates like these decide what counts as done. The checks were split out so that anyone using any AI tool can run them, with no GPU, no router and no model.
 
+## Support
+
+Gatestrainer is free, and stays free. If it saved you a bad merge, the Sponsor button at the top of the repo is there.
+
 ## License
 
 MIT or Apache-2.0, at your option.
