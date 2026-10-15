@@ -1,0 +1,29 @@
+{
+  "name": "markdown-docs",
+  "task": "documentation",
+  "about": "A Markdown document (README.md) for your code: every relative link and #anchor resolves, every code name it puts in `inline code` exists in the code, and it mentions every name you list. Proves the references are real and the coverage complete, not that the explanations are right.",
+  "proves": "partial",
+  "entry_file": "README.md",
+  "instructions": "Reply with the Markdown document only. Put every code name (functions, types, constants) in `inline code` or code blocks, exactly as spelled in the code; names you make up for an example must be defined in that example. Link only to headings in this document (#anchors) or to web pages.",
+  "inputs": {
+    "code": {
+      "kind": "file",
+      "to": "code/source.txt",
+      "about": "the code being documented (one file; concatenate several)",
+      "independent": true
+    },
+    "mention": {
+      "kind": "text",
+      "about": "comma-separated names the document must cover (e.g. the public API)",
+      "independent": true
+    }
+  },
+  "steps": [
+    "{{gatestrainer}} --check resolve --symbols-in {{code}} --mention {{mention}} README.md",
+    "{{gatestrainer}} --check refusal --file README.md --source {{code}}",
+    "{{gatestrainer}} --check date --file README.md --source {{code}}"
+  ],
+  "pick": {
+    "kind": "docs"
+  }
+}

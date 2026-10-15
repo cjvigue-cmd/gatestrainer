@@ -1,0 +1,14 @@
+{
+  "about": "Answer from one source, quoting it word for word and using only its numbers.",
+  "inputs": { "sources": { "file": "cited-answer/sources.txt" }, "min_quotes": 1 },
+  "good": [
+    "The colony grew to 412 nesting pairs (from 287 in 2019). The survey credits \"the removal of rats in 2021, which raised chick survival from 31% to 68%\", though the authors add that \"one good year does not establish a trend\".\n"
+  ],
+  "bad": [
+    "The colony grew to 412 nesting pairs. The survey says \"the removal of rats in 2020 raised chick survival\".\n",
+    "The colony grew to 450 nesting pairs, and the survey credits \"the removal of rats in 2021\" for it.\n",
+    "The colony grew to 412 nesting pairs, mostly because the rats were removed.\n",
+    "The colony grew to 412 nesting pairs. The survey credits \"the removal of rats in 2021, which raised chick survival from 31% to 68%\": removing rats completely solved the colony's decline.\n",
+    "The colony grew to 412 nesting pairs (from 287 in 2019). The survey credits \"the removal of rats in 2021, which raised chick survival from 31% to 68%\", though the authors add that \"one good year does not establish a trend\". Full survey: https://seabird-survey.example.org/full-report\n"
+  ]
+}

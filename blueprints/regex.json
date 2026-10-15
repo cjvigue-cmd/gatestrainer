@@ -1,0 +1,22 @@
+{
+  "name": "regex",
+  "task": "new code (a regular expression)",
+  "about": "A regular expression (pattern.txt) that matches every one of your positive examples and none of your negative ones, in the engine it will run in (Python's re by default, JavaScript's RegExp, or Rust's regex). As strong as your examples: put the near misses in the negatives.",
+  "proves": "full",
+  "entry_file": "pattern.txt",
+  "instructions": "Answer with the regular expression alone on one line: no slashes, quotes, flags, code fence or explanation.",
+  "inputs": {
+    "matches": { "kind": "file", "to": "match.txt", "about": "strings the pattern must match, one per line", "independent": true },
+    "rejects": { "kind": "file", "to": "no-match.txt", "about": "strings it must not match, one per line (the near misses)", "independent": true },
+    "engine": { "kind": "text", "about": "python, javascript or rust: where the pattern will run; default python", "default": "python" },
+    "mode": { "kind": "text", "about": "full (the whole string, as in validation) or search (anywhere in it); default full", "default": "full" }
+  },
+  "pick": {
+    "kind": "regex"
+  },
+  "steps": [
+    "{{gatestrainer}} --check regex --file pattern.txt --match match.txt --no-match no-match.txt --engine {{engine}} --mode {{mode}}"
+  ],
+  "timeout_seconds": 20,
+  "plants": ["mutate"]
+}

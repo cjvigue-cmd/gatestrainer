@@ -1,0 +1,22 @@
+{
+  "name": "json-schema",
+  "task": "structured data",
+  "about": "A JSON document (out.json) that fits your JSON Schema. Proves the shape, not that the values are right: add a count or tests gate for those.",
+  "proves": "partial",
+  "entry_file": "out.json",
+  "instructions": "Reply with the JSON document only.",
+  "inputs": {
+    "schema": {
+      "kind": "file",
+      "to": "schema.json",
+      "about": "a JSON Schema (subset: type, properties, required, additionalProperties, items, enum, const, numeric/length/item bounds, uniqueItems, pattern)",
+      "independent": true
+    }
+  },
+  "steps": [
+    "{{gatestrainer}} --check schema --schema {{schema}} out.json"
+  ],
+  "pick": {
+    "kind": "json"
+  }
+}

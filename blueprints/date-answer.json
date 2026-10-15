@@ -1,0 +1,19 @@
+{
+  "name": "date-answer",
+  "task": "date / deadline / day count",
+  "about": "An answer (answer.txt) whose final line `date: <date>` is the day you worked out yourself; every date in it is real and its weekday right.",
+  "proves": "full",
+  "entry_file": "answer.txt",
+  "instructions": "Show your working if you like, then end with exactly one line of the form `date: YYYY-MM-DD` (for example `date: 2026-11-07`). If you name a weekday, check it.",
+  "inputs": {
+    "expect": {
+      "kind": "text",
+      "about": "the correct date as YYYY-MM-DD, worked out independently of the model",
+      "independent": true
+    }
+  },
+  "steps": [
+    "{{gatestrainer}} --check date --file answer.txt --expect {{expect}} --pattern \"(?m)^date: *(.+?) *$\""
+  ],
+  "plants": ["date"]
+}

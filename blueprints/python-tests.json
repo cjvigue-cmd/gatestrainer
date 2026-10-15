@@ -1,0 +1,24 @@
+{
+  "name": "python-tests",
+  "task": "new code / bug fix",
+  "about": "A Python module (solution.py) that passes your hidden unittest file. For a bug fix, the tests include one that reproduces the bug.",
+  "proves": "full",
+  "entry_file": "solution.py",
+  "inputs": {
+    "tests": {
+      "kind": "file",
+      "to": "test_solution.py",
+      "about": "a unittest file that imports `solution`; written by you, never by the model",
+      "independent": true
+    }
+  },
+  "prechecks": ["placeholder", "claims", "secrets"],
+  "steps": [
+    "{{python}} -m unittest -q"
+  ],
+  "pick": {
+    "kind": "code",
+    "language": "python"
+  },
+  "plants": ["mutate"]
+}

@@ -1,0 +1,12 @@
+{
+  "about": "Compound interest: 1000 at 5% a year for 3 years.",
+  "inputs": { "expect": 1157.625, "rel": 1e-6 },
+  "good": [
+    "1000 × 1.05³ = 1157.625\nanswer: 1157.625\n",
+    "Year by year: 1050, 1102.5, 1157.625.\nanswer: 1.157625e3\n"
+  ],
+  "bad": [
+    "Simple interest: 1000 + 3 × 50.\nanswer: 1150\n",
+    "The total is 1157.63 after rounding to cents.\n"
+  ]
+}

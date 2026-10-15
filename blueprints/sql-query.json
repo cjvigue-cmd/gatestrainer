@@ -1,0 +1,39 @@
+{
+  "name": "sql-query",
+  "task": "new code / data analysis",
+  "about": "A SQL query (query.sql, SQLite) that returns exactly the rows your reference query returns on your data: same columns count, same rows (in order only if you say so). As strong as your data: include the rows that tell a right query from a near miss.",
+  "proves": "full",
+  "entry_file": "query.sql",
+  "instructions": "Answer with one SQLite query (SELECT or WITH … SELECT) and nothing else; it runs against the tables described in the task.",
+  "files": {
+    "check_sql.py": "\"\"\"query.sql returns the same rows as your reference query, on your data.\"\"\"\nimport sqlite3\nimport sys\n\ndef bad_check(msg):\n    print(\"sql: the check is misconfigured: \" + msg, file=sys.stderr)\n    sys.exit(2)\n\n\nif len(sys.argv) != 2 or sys.argv[1] not in (\"yes\", \"no\"):\n    bad_check(\"ordered must be yes or no\")\nORDERED = sys.argv[1] == \"yes\"\n\n\ndef fail(lines):\n    print(\"sql: FAILED — \" + lines[0], file=sys.stderr)\n    for line in lines[1:]:\n        print(\"  \" + line, file=sys.stderr)\n    sys.exit(1)\n\n\ndef norm(v):\n    # Floats compared to 9 significant digits; an integral float equals the integer.\n    if isinstance(v, float):\n        if v == int(v) and abs(v) < 2**53:\n            return int(v)\n        return float(\"%.9g\" % v)\n    return v\n\n\ndef key(row):\n    return tuple((v is None, type(v).__name__, v) for v in row)\n\n\ndef run(db, sql, who):\n    try:\n        cur = db.execute(sql)\n    except sqlite3.Error as e:\n        return None, \"%s: %s\" % (who, e)\n    if cur.description is None:\n        return None, \"%s is not a query (it returns no columns)\" % who\n    return [tuple(norm(v) for v in r) for r in cur.fetchall()], len(cur.description)\n\n\ndef main():\n    with open(\"fixture.sql\", encoding=\"utf-8\") as f:\n        fixture = f.read()\n    with open(\"reference.sql\", encoding=\"utf-8\") as f:\n        reference = f.read().strip().rstrip(\";\")\n    with open(\"query.sql\", encoding=\"utf-8\") as f:\n        answer = f.read().strip().rstrip(\";\")\n    db = sqlite3.connect(\":memory:\")\n    try:\n        db.executescript(fixture)\n    except sqlite3.Error as e:\n        bad_check(\"your data (fixture.sql): %s\" % e)\n    want, wcols = run(db, reference, \"your reference query\")\n    if want is None:\n        bad_check(wcols)\n    if not want:\n        bad_check(\"your reference query returns no rows on your data, so an empty answer would pass: add rows it returns\")\n    if not answer:\n        fail([\"query.sql is empty\"])\n    got, gcols = run(db, answer, \"query.sql\")\n    if got is None:\n        fail([gcols])\n    if gcols != wcols:\n        fail([\"query.sql returns %d column(s); the reference returns %d\" % (gcols, wcols)])\n    if ORDERED:\n        if got != want:\n            for i, (g, w) in enumerate(zip(got, want)):\n                if g != w:\n                    fail([\"row %d is %r; expected %r (order matters)\" % (i + 1, g, w)])\n            fail([\"%d row(s); expected %d\" % (len(got), len(want))])\n    else:\n        a, b = sorted(got, key=key), sorted(want, key=key)\n        if a != b:\n            missing = [r for r in b if r not in a]\n            extra = [r for r in a if r not in b]\n            lines = [\"%d row(s); expected %d, %d missing and %d extra (order ignored)\" % (len(got), len(want), len(missing), len(extra))]\n            lines += [\"missing %r\" % (r,) for r in missing[:5]]\n            lines += [\"extra %r\" % (r,) for r in extra[:5]]\n            fail(lines)\n    print(\"sql: ok — %d row(s) match the reference%s\" % (len(want), \" in order\" if ORDERED else \"\"))\n\n\nmain()\n"
+  },
+  "inputs": {
+    "data": {
+      "kind": "file",
+      "to": "fixture.sql",
+      "about": "CREATE TABLE and INSERT statements: the tables and the rows the query runs on",
+      "independent": true
+    },
+    "reference": {
+      "kind": "file",
+      "to": "reference.sql",
+      "about": "your own query that returns the right rows (it must return at least one)",
+      "independent": true
+    },
+    "ordered": {
+      "kind": "text",
+      "about": "yes when row order matters (ORDER BY is part of the task); default no",
+      "default": "no"
+    }
+  },
+  "pick": {
+    "kind": "sql"
+  },
+  "prechecks": ["placeholder", "claims", "secrets"],
+  "steps": [
+    "{{python}} check_sql.py {{ordered}}"
+  ],
+  "timeout_seconds": 30,
+  "plants": ["mutate"]
+}

@@ -1,0 +1,34 @@
+{
+  "name": "summarize",
+  "task": "summarize / extract",
+  "about": "A summary (summary.md) of your source, at most max_words words, whose quotations are word for word from the source and whose numbers all appear in it. Proves nothing was misquoted or invented among those, not that the summary is complete or fair.",
+  "proves": "partial",
+  "entry_file": "summary.md",
+  "instructions": "Reply with the summary only. Any quotation goes in double quotes, copied word for word from the source. Use only numbers that appear in the source, written the same way.",
+  "inputs": {
+    "source": {
+      "kind": "file",
+      "to": "source.txt",
+      "about": "the text to summarize",
+      "independent": true
+    },
+    "max_words": {
+      "kind": "number",
+      "about": "the longest the summary may be, in words",
+      "default": 200
+    }
+  },
+  "steps": [
+    "{{gatestrainer}} --check quote --source {{source}} --file summary.md",
+    "{{gatestrainer}} --check preserve --from summary.md --to {{source}} --keep numbers,urls",
+    "{{gatestrainer}} --check bounds --file summary.md --words 1:{{max_words}}",
+    "{{gatestrainer}} --check overclaim --file summary.md --source {{source}}",
+    "{{gatestrainer}} --check flattery --file summary.md --source {{source}}",
+    "{{gatestrainer}} --check refusal --file summary.md --source {{source}}",
+    "{{gatestrainer}} --check date --file summary.md --source {{source}}"
+  ],
+  "pick": {
+    "kind": "summary"
+  },
+  "plants": ["quote", "number", "overclaim", "flattery"]
+}

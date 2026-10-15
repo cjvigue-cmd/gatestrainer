@@ -1,0 +1,45 @@
+{
+  "name": "javascript-refactor",
+  "task": "refactor",
+  "about": "A rewrite of your JavaScript module (solution.mjs) that still passes your tests and returns exactly what the original returns on every case you give.",
+  "proves": "full",
+  "entry_file": "solution.mjs",
+  "instructions": "Return the complete rewritten module. Keep every export's name and signature.",
+  "files": {
+    "differ.mjs": "// One line per case: the function's result as JSON, or \"raises <Error>\".\nimport { createInterface } from \"node:readline\";\n\nconst [mod, name] = process.argv.slice(2);\nconst fn = (await import(`./${mod}.mjs`))[name];\nfor await (const line of createInterface({ input: process.stdin })) {\n  const t = line.trim();\n  if (!t) continue;\n  try {\n    const args = JSON.parse(t);\n    const out = await (Array.isArray(args) ? fn(...args) : fn(args));\n    console.log(out === undefined ? \"undefined\" : JSON.stringify(out));\n  } catch (e) {\n    console.log(\"raises \" + (e?.constructor?.name ?? \"Error\"));\n  }\n}\n"
+  },
+  "inputs": {
+    "original": {
+      "kind": "file",
+      "to": "original.mjs",
+      "about": "the module as it is now",
+      "independent": true
+    },
+    "tests": {
+      "kind": "file",
+      "to": "solution.test.mjs",
+      "about": "the existing node:test file, importing './solution.mjs'",
+      "independent": true
+    },
+    "call": {
+      "kind": "text",
+      "about": "the exported function the cases call"
+    },
+    "cases": {
+      "kind": "file",
+      "to": "cases.jsonl",
+      "about": "one call per line: a JSON array of the arguments (e.g. [3, [1, 2]]); cover the edge cases. Outputs must match exactly, so a change in float rounding counts",
+      "independent": true
+    }
+  },
+  "prechecks": ["placeholder", "claims", "secrets"],
+  "steps": [
+    "{{node}} --test solution.test.mjs",
+    "{{gatestrainer}} --check differential --cases {{cases}} --left \"{{node}} differ.mjs original {{call}}\" --right \"{{node}} differ.mjs solution {{call}}\""
+  ],
+  "pick": {
+    "kind": "refactor",
+    "language": "javascript"
+  },
+  "plants": ["mutate"]
+}

@@ -1,0 +1,8 @@
+[0.5, false]
+[1, false]
+[1.01, false]
+[5, false]
+[5.5, true]
+[12.3, false]
+[0, false]
+[-2, true]

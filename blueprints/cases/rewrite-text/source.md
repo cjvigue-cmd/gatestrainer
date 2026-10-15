@@ -1,0 +1,1 @@
+Hi {name}, your order #48213 ships on 2026-11-02. its 3 boxes weigh 12.5 kg in total, and you can track them at https://example.com/track/48213 . If anything is wrong reply to this email or run `gatestrainer support` within 14 days.

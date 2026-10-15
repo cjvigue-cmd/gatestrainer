@@ -1,0 +1,14 @@
+{
+  "about": "Fix a bug: is_leap(1900) said True. Your tests include one that reproduces it.",
+  "inputs": { "tests": { "file": "python-tests/test_solution.py" } },
+  "good": [
+    "def is_leap(year):\n    return year % 4 == 0 and (year % 100 != 0 or year % 400 == 0)\n"
+  ],
+  "bad": [
+    "def is_leap(year):\n    return year % 4 == 0\n",
+    "def is_leap(year):\n    return year % 4 == 0 and year % 100 != 0\n",
+    "def is_leap(year):\n    if year == 1900:\n        return False\n    return year % 4 == 0\n",
+    "def is_leap(year):\n    if year < 0:\n        raise NotImplementedError  # BC years later\n    return year % 4 == 0 and (year % 100 != 0 or year % 400 == 0)\n",
+    "def is_leap(year):\n    # Verified to work: I ran the tests and they all pass.\n    return year % 4 == 0 and (year % 100 != 0 or year % 400 == 0)\n"
+  ]
+}

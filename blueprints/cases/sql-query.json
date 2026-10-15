@@ -1,0 +1,15 @@
+{
+  "about": "Paid spend per customer with at least two paid orders, highest first. The data has a refunded order (Ana), a one-order customer (Bo) and a customer with only refunds (Di), so each near miss shows.",
+  "inputs": { "data": { "file": "sql-query/data.sql" }, "reference": { "file": "sql-query/reference.sql" }, "ordered": "yes" },
+  "good": [
+    "SELECT c.name, SUM(o.total) FROM orders o JOIN customers c ON c.id = o.customer_id WHERE o.status = 'paid' GROUP BY c.name HAVING COUNT(o.id) > 1 ORDER BY 2 DESC;",
+    "WITH paid AS (SELECT customer_id, total FROM orders WHERE status = 'paid')\nSELECT name, (SELECT SUM(total) FROM paid WHERE customer_id = c.id) AS s\nFROM customers c\nWHERE (SELECT COUNT(*) FROM paid WHERE customer_id = c.id) >= 2\nORDER BY s DESC"
+  ],
+  "bad": [
+    "SELECT c.name, SUM(o.total) FROM customers c JOIN orders o ON o.customer_id = c.id GROUP BY c.id HAVING COUNT(*) >= 2 ORDER BY 2 DESC",
+    "SELECT c.name, SUM(o.total) FROM customers c JOIN orders o ON o.customer_id = c.id WHERE o.status = 'paid' GROUP BY c.id ORDER BY 2 DESC",
+    "SELECT c.name, SUM(o.total) FROM customers c JOIN orders o ON o.customer_id = c.id WHERE o.status = 'paid' GROUP BY c.id HAVING COUNT(*) >= 2 ORDER BY 2",
+    "SELECT name FROM customers",
+    "SELEC name FROM customers"
+  ]
+}

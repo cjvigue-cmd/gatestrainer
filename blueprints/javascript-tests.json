@@ -1,0 +1,24 @@
+{
+  "name": "javascript-tests",
+  "task": "new code / bug fix",
+  "about": "A JavaScript module (solution.mjs) that passes your hidden node:test file. For a bug fix, the tests include one that reproduces the bug.",
+  "proves": "full",
+  "entry_file": "solution.mjs",
+  "inputs": {
+    "tests": {
+      "kind": "file",
+      "to": "solution.test.mjs",
+      "about": "a node:test file importing './solution.mjs'; written by you, never by the model",
+      "independent": true
+    }
+  },
+  "prechecks": ["placeholder", "claims", "secrets"],
+  "steps": [
+    "{{node}} --test"
+  ],
+  "pick": {
+    "kind": "code",
+    "language": "javascript"
+  },
+  "plants": ["mutate"]
+}

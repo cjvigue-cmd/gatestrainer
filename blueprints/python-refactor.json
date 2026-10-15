@@ -1,0 +1,45 @@
+{
+  "name": "python-refactor",
+  "task": "refactor",
+  "about": "A rewrite of your Python module (solution.py) that still passes your tests and returns exactly what the original returns on every case you give.",
+  "proves": "full",
+  "entry_file": "solution.py",
+  "instructions": "Return the complete rewritten module. Keep every public function's name and signature.",
+  "files": {
+    "differ.py": "# One line per case: the function's result as JSON, or \"raises <Error>\".\nimport importlib, json, sys\n\nmodule, name = sys.argv[1], sys.argv[2]\nfn = getattr(importlib.import_module(module), name)\nfor line in sys.stdin:\n    line = line.strip()\n    if not line:\n        continue\n    try:\n        args = json.loads(line)\n        out = fn(*args) if isinstance(args, list) else fn(args)\n        print(json.dumps(out, sort_keys=True, default=repr))\n    except Exception as e:\n        print(\"raises \" + type(e).__name__)\n"
+  },
+  "inputs": {
+    "original": {
+      "kind": "file",
+      "to": "original.py",
+      "about": "the module as it is now",
+      "independent": true
+    },
+    "tests": {
+      "kind": "file",
+      "to": "test_solution.py",
+      "about": "the existing unittest file, importing `solution`",
+      "independent": true
+    },
+    "call": {
+      "kind": "text",
+      "about": "the function the cases call (its name in both modules)"
+    },
+    "cases": {
+      "kind": "file",
+      "to": "cases.jsonl",
+      "about": "one call per line: a JSON array of the arguments (e.g. [3, [1, 2]]); cover the edge cases. Outputs must match exactly, so a change in float rounding counts",
+      "independent": true
+    }
+  },
+  "prechecks": ["placeholder", "claims", "secrets"],
+  "steps": [
+    "{{python}} -m unittest -q",
+    "{{gatestrainer}} --check differential --cases {{cases}} --left \"{{python}} differ.py original {{call}}\" --right \"{{python}} differ.py solution {{call}}\""
+  ],
+  "pick": {
+    "kind": "refactor",
+    "language": "python"
+  },
+  "plants": ["mutate"]
+}

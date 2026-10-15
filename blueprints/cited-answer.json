@@ -1,0 +1,33 @@
+{
+  "name": "cited-answer",
+  "task": "factual answer",
+  "about": "An answer (answer.md) to a question about your sources that quotes them — at least min_quotes quotations, each word for word — and uses only numbers found in them. Proves the evidence is real, not that it supports the answer.",
+  "proves": "partial",
+  "entry_file": "answer.md",
+  "instructions": "Reply with the answer only. Support it with quotations from the sources, in double quotes or as > block quotes, copied word for word (at least four words each). Use only numbers that appear in the sources, written the same way.",
+  "inputs": {
+    "sources": {
+      "kind": "file",
+      "to": "sources.txt",
+      "about": "the source text(s) the answer must rest on",
+      "independent": true
+    },
+    "min_quotes": {
+      "kind": "number",
+      "about": "the fewest quotations the answer must contain",
+      "default": 1
+    }
+  },
+  "steps": [
+    "{{gatestrainer}} --check quote --source {{sources}} --file answer.md --min-quotes {{min_quotes}}",
+    "{{gatestrainer}} --check preserve --from answer.md --to {{sources}} --keep numbers,urls",
+    "{{gatestrainer}} --check overclaim --file answer.md --source {{sources}}",
+    "{{gatestrainer}} --check flattery --file answer.md --source {{sources}}",
+    "{{gatestrainer}} --check refusal --file answer.md --source {{sources}}",
+    "{{gatestrainer}} --check date --file answer.md --source {{sources}}"
+  ],
+  "pick": {
+    "kind": "cited"
+  },
+  "plants": ["quote", "number", "overclaim", "flattery"]
+}

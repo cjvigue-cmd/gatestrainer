@@ -1,0 +1,23 @@
+{
+  "about": "Tidy a shipping-cost function without changing what it returns, edge cases included (the 1 kg and 5 kg boundaries, express, bad weights).",
+  "inputs": {
+    "original": {
+      "file": "python-refactor/original.py"
+    },
+    "tests": {
+      "file": "python-refactor/test_solution.py"
+    },
+    "call": "shipping",
+    "cases": {
+      "file": "python-refactor/cases.jsonl"
+    }
+  },
+  "good": [
+    "def shipping(weight_kg, express):\n    if weight_kg <= 0:\n        raise ValueError(\"weight must be positive\")\n    if weight_kg <= 1:\n        cost = 5\n    elif weight_kg <= 5:\n        cost = 5 + (weight_kg - 1) * 2\n    else:\n        cost = 13 + (weight_kg - 5) * 1.5\n    if express:\n        cost *= 2\n    return round(cost, 2)\n"
+  ],
+  "bad": [
+    "def shipping(weight_kg, express):\n    if weight_kg <= 0:\n        raise ValueError(\"weight must be positive\")\n    if weight_kg <= 1:\n        cost = 5\n    elif weight_kg <= 5:\n        cost = 5 + int(weight_kg - 1) * 2\n    else:\n        cost = 13 + (weight_kg - 5) * 1.5\n    return round(cost * (2 if express else 1), 2)\n",
+    "def shipping(weight_kg, express):\n    if weight_kg <= 0:\n        raise ValueError(\"weight must be positive\")\n    cost = 5 if weight_kg <= 1 else 5 + (weight_kg - 1) * 2 if weight_kg <= 5 else 13 + (weight_kg - 5) * 1.5\n    return cost * 2 if express else cost\n",
+    "def shipping(weight_kg, express):\n    if weight_kg < 0:\n        raise ValueError(\"weight must be positive\")\n    if weight_kg <= 1:\n        cost = 5\n    elif weight_kg <= 5:\n        cost = 5 + (weight_kg - 1) * 2\n    else:\n        cost = 13 + (weight_kg - 5) * 1.5\n    return round(cost * (2 if express else 1), 2)\n"
+  ]
+}

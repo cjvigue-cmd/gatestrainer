@@ -1,0 +1,15 @@
+{
+  "about": "A package manifest that fits your schema: lowercase name, x.y.z version, dependencies as name/version pairs, nothing extra.",
+  "inputs": { "schema": { "file": "json-schema/schema.json" } },
+  "good": [
+    "{\"name\": \"gatestrainer-demo\", \"version\": \"1.2.0\", \"dependencies\": [{\"name\": \"serde\", \"version\": \"1.0\"}]}",
+    "{\"name\": \"x\", \"version\": \"0.0.1\", \"dependencies\": []}"
+  ],
+  "bad": [
+    "{\"name\": \"Gatestrainer\", \"version\": \"1.2.0\", \"dependencies\": []}",
+    "{\"name\": \"gatestrainer\", \"version\": \"1.2\", \"dependencies\": []}",
+    "{\"name\": \"gatestrainer\", \"version\": \"1.2.0\", \"dependencies\": {\"serde\": \"1.0\"}}",
+    "{\"name\": \"gatestrainer\", \"version\": \"1.2.0\", \"dependencies\": [], \"license\": \"MIT\"}",
+    "{\"name\": \"gatestrainer\", \"version\": \"1.2.0\", \"dependencies\": [],}"
+  ]
+}

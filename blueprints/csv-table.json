@@ -1,0 +1,26 @@
+{
+  "name": "csv-table",
+  "task": "structured data",
+  "about": "A CSV table (out.csv) with exactly your columns, each cell of its type, and at least min_rows rows. Proves the shape, not that the values are right.",
+  "proves": "partial",
+  "entry_file": "out.csv",
+  "instructions": "Reply with the CSV only: a header row, then the data rows.",
+  "inputs": {
+    "columns": {
+      "kind": "text",
+      "about": "name:type,... with types str, int, float, bool; a trailing ? allows an empty cell",
+      "independent": true
+    },
+    "min_rows": {
+      "kind": "number",
+      "about": "the fewest data rows allowed",
+      "default": 1
+    }
+  },
+  "steps": [
+    "{{gatestrainer}} --check csv --columns {{columns}} --min-rows {{min_rows}} out.csv"
+  ],
+  "pick": {
+    "kind": "csv"
+  }
+}

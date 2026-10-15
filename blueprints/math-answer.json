@@ -1,0 +1,32 @@
+{
+  "name": "math-answer",
+  "task": "math / calculation",
+  "about": "A worked answer (answer.txt) whose final line `answer: <number>` is within tolerance of the value you computed yourself.",
+  "proves": "full",
+  "entry_file": "answer.txt",
+  "instructions": "Show your working if you like, then end with exactly one line of the form `answer: <number>` (digits, optional sign, decimal point or exponent; no units).",
+  "inputs": {
+    "expect": {
+      "kind": "number",
+      "about": "the correct value, computed independently of the model",
+      "independent": true
+    },
+    "abs": {
+      "kind": "number",
+      "about": "absolute tolerance",
+      "default": 0
+    },
+    "rel": {
+      "kind": "number",
+      "about": "relative tolerance",
+      "default": 1e-09
+    }
+  },
+  "steps": [
+    "{{gatestrainer}} --check numeric --file answer.txt --pattern \"(?m)^answer: *(\\S+) *$\" --expect {{expect}} --abs {{abs}} --rel {{rel}}"
+  ],
+  "pick": {
+    "kind": "math"
+  },
+  "plants": ["number"]
+}

@@ -1,0 +1,28 @@
+{
+  "name": "rust-tests",
+  "task": "new code / bug fix",
+  "about": "A Rust library file (src/lib.rs) that passes your hidden tests. For a bug fix, the tests include one that reproduces the bug.",
+  "proves": "full",
+  "entry_file": "src/lib.rs",
+  "files": {
+    "Cargo.toml": "[package]\nname = \"task\"\nversion = \"0.0.0\"\nedition = \"2021\"\n\n[lib]\npath = \"src/lib.rs\"\n\n[workspace]\n",
+    "tests/hidden.rs": "use task::*;\n{{tests}}"
+  },
+  "inputs": {
+    "tests": {
+      "kind": "text",
+      "about": "#[test] functions calling the library's public items (`use task::*;` is added); written by you, never by the model",
+      "independent": true
+    }
+  },
+  "prechecks": ["placeholder", "claims", "secrets"],
+  "steps": [
+    "{{cargo}} test --offline --quiet --test hidden"
+  ],
+  "timeout_seconds": 180,
+  "pick": {
+    "kind": "code",
+    "language": "rust"
+  },
+  "plants": ["mutate"]
+}

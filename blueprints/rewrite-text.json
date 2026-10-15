@@ -1,0 +1,47 @@
+{
+  "name": "rewrite-text",
+  "task": "edit / proofread / translate",
+  "about": "Your text (source.md) rewritten — edited, proofread, restyled or translated — keeping every number, URL, code span and placeholder (and, if you ask, the heading outline and named terms), at a length within min_ratio–max_ratio of the original. Proves nothing was lost or changed among those, not that the prose is good.",
+  "proves": "partial",
+  "entry_file": "out.md",
+  "instructions": "Reply with the rewritten text only. Keep every number, URL, `code` span and placeholder such as {name} exactly as written (same digits and separators).",
+  "inputs": {
+    "source": {
+      "kind": "file",
+      "to": "source.md",
+      "about": "the text to rewrite",
+      "independent": true
+    },
+    "keep": {
+      "kind": "text",
+      "about": "what must survive: any of numbers, urls, code, placeholders, headings",
+      "default": "numbers,urls,code,placeholders"
+    },
+    "terms": {
+      "kind": "text",
+      "about": "comma-separated names or terms that must survive (product names …)",
+      "default": ""
+    },
+    "min_ratio": {
+      "kind": "number",
+      "about": "shortest allowed, in words, against the original",
+      "default": 0.5
+    },
+    "max_ratio": {
+      "kind": "number",
+      "about": "longest allowed, in words, against the original",
+      "default": 1.5
+    }
+  },
+  "steps": [
+    "{{gatestrainer}} --check preserve --from {{source}} --to out.md --keep {{keep}} --terms {{terms}}",
+    "{{gatestrainer}} --check bounds --file out.md --ratio-of {{source}} --ratio {{min_ratio}}:{{max_ratio}}",
+    "{{gatestrainer}} --check flattery --file out.md --source {{source}}",
+    "{{gatestrainer}} --check refusal --file out.md --source {{source}}",
+    "{{gatestrainer}} --check date --file out.md --source {{source}}"
+  ],
+  "pick": {
+    "kind": "rewrite"
+  },
+  "plants": ["number", "flattery"]
+}

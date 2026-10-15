@@ -1,0 +1,32 @@
+{
+  "name": "python-tests-for",
+  "task": "tests",
+  "about": "A unittest file (test_solution.py) for your module that passes on it and catches at least min_killed of its mutants (flipped comparisons, constants off by one …).",
+  "proves": "full",
+  "entry_file": "test_solution.py",
+  "instructions": "Return only the unittest file. It imports from `solution`. Test the edges: boundaries, empty input, both sides of every condition.",
+  "inputs": {
+    "code": {
+      "kind": "file",
+      "to": "solution.py",
+      "about": "the module to test, correct as it is",
+      "independent": true
+    },
+    "min_killed": {
+      "kind": "number",
+      "about": "share of mutants the tests must catch (0..1); some mutants can't be caught by any input, so 1.0 is rarely right",
+      "default": 0.7
+    }
+  },
+  "prechecks": ["placeholder", "claims", "secrets"],
+  "steps": [
+    "{{python}} -m unittest -q",
+    "{{gatestrainer}} --check mutation --file {{code}} --run \"{{python}} -m unittest -q\" --min-killed {{min_killed}}"
+  ],
+  "timeout_seconds": 300,
+  "pick": {
+    "kind": "tests",
+    "language": "python"
+  },
+  "plants": ["mutate"]
+}

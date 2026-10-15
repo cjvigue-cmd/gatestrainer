@@ -1,0 +1,14 @@
+{
+  "about": "A deadline 30 days after Thursday, October 8, 2026.",
+  "inputs": { "expect": "2026-11-07" },
+  "good": [
+    "October has 31 days: 23 days to the end of it, then 7 into November.\ndate: 2026-11-07\n",
+    "Thirty days after Thursday, October 8, 2026 is Saturday, November 7, 2026.\ndate: November 7, 2026\n"
+  ],
+  "bad": [
+    "Counting the first day too.\ndate: 2026-11-06\n",
+    "Thirty days after Thursday, October 8, 2026 is Friday, November 7, 2026.\ndate: 2026-11-07\n",
+    "One month later.\ndate: 11/07/2026\n",
+    "The deadline is November 7, 2026.\n"
+  ]
+}
