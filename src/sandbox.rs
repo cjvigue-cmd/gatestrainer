@@ -431,6 +431,7 @@ impl HardenGuard {
 
 /// Which [`Isolation`] level is in force, from which kernel layers
 /// actually initialised (Linux only: `harden`'s other branches are fixed).
+#[cfg_attr(not(target_os = "linux"), allow(dead_code))]
 fn isolation_for(has_landlock: bool, has_seccomp: bool) -> Isolation {
     match (has_landlock, has_seccomp) {
         (true, true) => Isolation::LandlockSeccomp,
