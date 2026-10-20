@@ -17,7 +17,7 @@
   },
   "prechecks": ["placeholder", "claims", "secrets"],
   "steps": [
-    "{{cargo}} test --offline --quiet --test hidden"
+    "{{gatestrainer}} --check ran --each '^running [0-9]+ tests?$' --done '^test result: ' --match '^test result: ok\\. [1-9]' -- {{cargo}} test --offline --quiet --test hidden"
   ],
   "timeout_seconds": 180,
   "pick": {

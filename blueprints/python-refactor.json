@@ -34,7 +34,7 @@
   },
   "prechecks": ["placeholder", "claims", "secrets"],
   "steps": [
-    "{{python}} -m unittest -q",
+    "{{gatestrainer}} --check ran --match '^Ran [1-9][0-9]* tests? in ' --match '^OK' -- {{python}} -m unittest -q",
     "{{gatestrainer}} --check differential --cases {{cases}} --left \"{{python}} differ.py original {{call}}\" --right \"{{python}} differ.py solution {{call}}\""
   ],
   "pick": {

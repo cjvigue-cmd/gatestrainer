@@ -119,6 +119,9 @@ pub(crate) fn run(args: &[String]) -> Run {
         return Err("--size: every side must be a positive number".into());
     }
     let tol: f64 = a.number("tol")?.unwrap_or(0.05);
+    if !tol.is_finite() || tol < 0.0 {
+        return Err("--tol: a number of mm, 0 or more".into());
+    }
     let any_order = match a.one("orientation")?.unwrap_or("fixed") {
         "fixed" => false,
         "any" => true,
@@ -130,6 +133,9 @@ pub(crate) fn run(args: &[String]) -> Run {
         Some(s) => Some(s.parse::<f64>().ok().filter(|v| v.is_finite() && *v > 0.0).ok_or("--volume: a positive number of mm³")?),
     };
     let vol_tol: f64 = a.number("vol-tol")?.unwrap_or(0.01);
+    if !vol_tol.is_finite() || vol_tol < 0.0 {
+        return Err("--vol-tol: a fraction, 0 or more (0.01 = 1%)".into());
+    }
     let file = a.need("file")?;
     let bytes = match std::fs::read(file) {
         Ok(b) => b,
@@ -140,6 +146,9 @@ pub(crate) fn run(args: &[String]) -> Run {
         Ok(t) => t,
         Err(why) => return Ok(Outcome::Fail(Fail(vec![format!("{file}: {why}")]))),
     };
+    if let Some(i) = tris.iter().position(|t| t.iter().flatten().any(|c| !c.is_finite())) {
+        return Ok(Outcome::Fail(Fail(vec![format!("{file}: triangle {} has a vertex that isn't a finite number (NaN or infinity)", i + 1)])));
+    }
     let (lo, hi) = bounds(&tris);
     let mut got = [hi[0] - lo[0], hi[1] - lo[1], hi[2] - lo[2]];
     let mut want = [wx, wy, wz];
@@ -262,6 +271,12 @@ mod tests {
         assert!(matches!(run_(&["--size", "60,40,4", "--volume", "9650", "--vol-tol", "0.01"]), Ok(Outcome::Pass(_))));
         assert!(run_(&["--size", "60,40"]).is_err());
         assert!(run_(&["--size", "60,40,4", "--orientation", "up"]).is_err());
+        assert!(run_(&["--size", "50,50,50", "--tol", "NaN"]).is_err(), "a NaN tolerance would pass anything");
+        assert!(run_(&["--size", "60,40,4", "--volume", "9600", "--vol-tol", "-1"]).is_err());
+        let mut c = cuboid(60.0, 40.0, 4.0);
+        c[0][0] = [f64::NAN; 3];
+        std::fs::write(&f, binary(&c)).expect("write");
+        assert!(fails(run_(&["--size", "60,40,4", "--volume", "12345"]))[0].contains("isn't a finite number"));
         std::fs::write(&f, "solid empty\nendsolid empty\n").expect("write");
         assert!(fails(run_(&["--size", "1,1,1"]))[0].contains("no triangles"));
     }

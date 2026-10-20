@@ -94,7 +94,11 @@ pub(crate) fn run(args: &[String]) -> Run {
         ignore.iter().any(|r| covered(key, r)) || base_in_root.as_deref().is_some_and(|b| !b.is_empty() && (key == b || key.starts_with(&format!("{b}/"))))
     };
     let before = walk(baseline, &skip)?;
-    let after = walk(root, &skip)?;
+    // ROOT holds the answer's work: a file it left unreadable is its failure.
+    let after = match walk(root, &skip) {
+        Ok(a) => a,
+        Err(e) => return Ok(Outcome::Fail(Fail(vec![format!("the result can't be read: {e}")]))),
+    };
     let mut changed = Vec::new();
     for (key, entry) in &after {
         match before.get(key) {
@@ -180,6 +184,19 @@ mod tests {
                 assert!(l[2].starts_with("src/util.rs (modified)"), "{l:?}");
             }
             _ => panic!("out of scope"),
+        }
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let locked = d.path().join("src/locked.rs");
+            std::fs::write(&locked, "x").expect("write");
+            std::fs::set_permissions(&locked, std::fs::Permissions::from_mode(0o000)).expect("chmod");
+            let r = go(d.path(), &["--allow", "src/"]);
+            std::fs::set_permissions(&locked, std::fs::Permissions::from_mode(0o644)).expect("chmod back");
+            // Root reads anything, so only a non-root run can see the refusal.
+            if std::fs::metadata("/root").is_ok_and(|m| m.permissions().mode() & 0o004 == 0) && std::fs::read_dir("/root").is_err() {
+                assert!(matches!(r, Ok(Outcome::Fail(_))), "an unreadable result file is the answer's failure");
+            }
         }
     }
 

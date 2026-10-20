@@ -147,6 +147,12 @@ pub async fn execute_and_validate(req: GateRequest, sink: Option<&EventSink>) ->
     let (mut elapsed, mut peak, mut passed_out) = (Duration::ZERO, 0u64, Vec::new());
     let mut out = None;
     for (i, argv) in argvs.iter().enumerate() {
+        // Each step starts from the gate's own files: the answer's code ran
+        // in the last step and could have rewritten them — the original a
+        // differential step compares against, or the answer itself.
+        if i > 0 {
+            write_files(&root, &req.files)?;
+        }
         let mut step = run_sandboxed(&root, argv, limits, sink).await?;
         elapsed += step.elapsed;
         peak = peak.max(step.peak_rss_bytes);
@@ -241,12 +247,27 @@ pub async fn execute_and_validate(req: GateRequest, sink: Option<&EventSink>) ->
 /// `{{gatestrainer}} --check …` wherever this program is installed.
 pub const PROGRAM_PLACEHOLDER: &str = "{{gatestrainer}}";
 
+/// The program `{{gatestrainer}}` runs: this binary. In a unit-test build
+/// this binary is the test harness, which would read `--check …` as a test
+/// filter and exit 0 — every such gate passing; there it's the crate's own
+/// built binary beside the harness (`tests/bin_built.rs` makes cargo build
+/// it), and the harness only if that's missing.
+fn self_for_gates() -> std::io::Result<PathBuf> {
+    let me = std::env::current_exe()?;
+    if cfg!(test) {
+        if let Some(bin) = me.parent().and_then(Path::parent).map(|d| d.join(format!("gatestrainer{}", std::env::consts::EXE_SUFFIX))).filter(|b| b.is_file()) {
+            return Ok(bin);
+        }
+    }
+    Ok(me)
+}
+
 /// `cmd` with [`PROGRAM_PLACEHOLDER`] replaced by this binary's path, quoted.
 fn with_program(cmd: &str) -> Result<String> {
     if !cmd.contains(PROGRAM_PLACEHOLDER) {
         return Ok(cmd.to_string());
     }
-    let exe = std::env::current_exe().map_err(|e| Error::SandboxError(format!("{PROGRAM_PLACEHOLDER}: this program's path: {e}")))?;
+    let exe = self_for_gates().map_err(|e| Error::SandboxError(format!("{PROGRAM_PLACEHOLDER}: this program's path: {e}")))?;
     let exe = exe.to_string_lossy().into_owned();
     let quoted = shlex::try_quote(&exe).map_err(|e| Error::SandboxError(format!("{PROGRAM_PLACEHOLDER}: {exe}: {e}")))?;
     Ok(cmd.replace(PROGRAM_PLACEHOLDER, &quoted))
@@ -285,10 +306,26 @@ fn write_files(root: &Path, files: &HashMap<String, String>) -> Result<()> {
     // PathBuf everywhere (§9); reject any filename that escapes the root.
     for (name, contents) in files {
         let p = join_safe(root, name)?;
+        // Between steps the folder holds whatever the last step left: a
+        // folder on the way may have become a link out of the gate, and the
+        // file itself a link or a folder. Nothing is written through a link.
+        let mut at = root.to_path_buf();
+        for c in Path::new(name).parent().into_iter().flat_map(Path::components) {
+            at.push(c);
+            if std::fs::symlink_metadata(&at).is_ok_and(|m| m.file_type().is_symlink()) {
+                return Err(Error::GateFailure(format!("{name}: a step replaced its folder with a link; the gate's files can't be restored")));
+            }
+        }
         if let Some(parent) = p.parent() {
             std::fs::create_dir_all(parent)
                 .map_err(|e| Error::SandboxError(format!("mkdir {}: {e}", parent.display())))?;
         }
+        match std::fs::symlink_metadata(&p) {
+            Ok(m) if m.is_dir() => std::fs::remove_dir_all(&p),
+            Ok(_) => std::fs::remove_file(&p),
+            Err(_) => Ok(()),
+        }
+        .map_err(|e| Error::SandboxError(format!("replace {}: {e}", p.display())))?;
         std::fs::write(&p, contents)
             .map_err(|e| Error::SandboxError(format!("write {}: {e}", p.display())))?;
     }
@@ -309,12 +346,13 @@ pub(crate) fn join_safe(root: &Path, name: &str) -> Result<PathBuf> {
             "absolute filename rejected: {name}"
         )));
     }
-    // Reject any component that is `..`.
+    // Only plain names: `..` climbs out, and on Windows `\\x` (a root) and
+    // `C:x` (a drive) aren't absolute yet make `join` leave the root.
     for c in p.components() {
-        if matches!(c, std::path::Component::ParentDir) {
-            return Err(Error::SandboxError(format!(
-                "path traversal rejected: {name}"
-            )));
+        match c {
+            std::path::Component::Normal(_) | std::path::Component::CurDir => {}
+            std::path::Component::ParentDir => return Err(Error::SandboxError(format!("path traversal rejected: {name}"))),
+            std::path::Component::RootDir | std::path::Component::Prefix(_) => return Err(Error::SandboxError(format!("absolute filename rejected: {name}"))),
         }
     }
     Ok(root.join(p))
@@ -424,7 +462,7 @@ mod tests {
     #[test]
     fn the_program_placeholder_is_this_binary_quoted() {
         let cmd = with_program("{{gatestrainer}} --check count --pattern x --eq 0 a.txt").unwrap();
-        let exe = std::env::current_exe().unwrap().to_string_lossy().into_owned();
+        let exe = self_for_gates().unwrap().to_string_lossy().into_owned();
         assert_eq!(split_command(&cmd).unwrap()[0], exe);
         assert_eq!(with_program("cargo test").unwrap(), "cargo test");
     }
@@ -508,6 +546,30 @@ mod tests {
         // A sneaky traversal buried in a subdir.
         let r = join_safe(&root, "sub/../../escape.rs");
         assert!(matches!(r, Err(Error::SandboxError(s)) if s.contains("traversal")));
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn every_step_starts_from_the_gates_own_files() {
+        let files = HashMap::from([("a.txt".to_string(), "orig\n".to_string()), ("b.txt".to_string(), "forged\n".to_string())]);
+        let mut r = req(files, "cp b.txt a.txt", 10, 1, 3);
+        r.then = vec!["grep -q orig a.txt".into()];
+        let g = execute_and_validate(r, None).await.unwrap();
+        assert!(g.passed, "step 2 must see a.txt as the gate wrote it, not as step 1 left it: {}", g.stderr);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn nothing_is_written_through_a_folder_a_step_turned_into_a_link() {
+        let root = tempfile::tempdir().unwrap();
+        let outside = tempfile::tempdir().unwrap();
+        std::os::unix::fs::symlink(outside.path(), root.path().join("tests")).unwrap();
+        let r = write_files(root.path(), &HashMap::from([("tests/hidden.rs".to_string(), "x".to_string())]));
+        assert!(matches!(r, Err(Error::GateFailure(_))), "{r:?}");
+        assert!(!outside.path().join("hidden.rs").exists(), "nothing written outside the gate");
+        std::os::unix::fs::symlink(outside.path().join("target.txt"), root.path().join("f.txt")).unwrap();
+        write_files(root.path(), &HashMap::from([("f.txt".to_string(), "z".to_string())])).unwrap();
+        assert!(!outside.path().join("target.txt").exists(), "a file that became a link is replaced, not written through");
     }
 
     #[test]
@@ -929,8 +991,10 @@ mod tests {
     }
 
     /// Landlock can't deny UDP, so a gate could send data out in DNS
-    /// queries; the seccomp filter refuses IPv4 / IPv6 sockets outright.
-    /// Unix sockets, which local tools use, still work.
+    /// queries; the seccomp filter refuses IPv4 / IPv6 sockets outright —
+    /// and Unix sockets, which reach dockerd or the session bus (Landlock
+    /// doesn't govern connect()). socketpair(), the interpreters' own
+    /// child pipes, still works.
     #[cfg(target_os = "linux")]
     #[tokio::test]
     async fn gate_cannot_open_udp_or_tcp_sockets_under_seccomp() {
@@ -952,14 +1016,20 @@ for fam, kind in [(socket.AF_INET, socket.SOCK_DGRAM), (socket.AF_INET6, socket.
         print("OPENED", fam, kind)
     except PermissionError:
         print("DENIED", fam, kind)
-socket.socket(socket.AF_UNIX, socket.SOCK_STREAM).close()
-print("UNIX OK")
+try:
+    socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    print("UNIX OPENED")
+except PermissionError:
+    print("UNIX DENIED")
+a, b = socket.socketpair()
+a.sendall(b"x"); print("PAIR OK" if b.recv(1) == b"x" else "PAIR BROKEN")
 "#;
         let g = run(one_file("probe.py", probe), "python3 probe.py", 20, 1, 3).await.unwrap();
         assert!(g.passed, "the probe itself runs: {}", g.stderr);
         assert!(!g.stdout.contains("OPENED"), "an inet socket opened: {}", g.stdout);
-        assert_eq!(g.stdout.matches("DENIED").count(), 3, "{}", g.stdout);
-        assert!(g.stdout.contains("UNIX OK"), "Unix sockets still work: {}", g.stdout);
+        assert_eq!(g.stdout.matches("DENIED").count(), 4, "{}", g.stdout);
+        assert!(g.stdout.contains("UNIX DENIED"), "a Unix socket would reach dockerd: {}", g.stdout);
+        assert!(g.stdout.contains("PAIR OK"), "socketpair still works: {}", g.stdout);
     }
 
     #[cfg(target_os = "linux")]

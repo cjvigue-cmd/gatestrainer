@@ -14,7 +14,7 @@
   },
   "prechecks": ["placeholder", "claims", "secrets"],
   "steps": [
-    "{{node}} --test"
+    "{{gatestrainer}} --check ran --forbid '^✔ \\S+\\.test\\.[cm]?[jt]s\\b' -- {{node}} --test"
   ],
   "pick": {
     "kind": "code",

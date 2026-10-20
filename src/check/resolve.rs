@@ -38,6 +38,7 @@ fn parse(text: &str) -> Doc {
     let mut code = Vec::new();
     let mut anchors = BTreeSet::new();
     let mut fence: Option<String> = None;
+    let link = regex::Regex::new(r"!?\[([^\]]*)\]\([^)]*\)").ok();
     for (i, line) in text.lines().enumerate() {
         let t = line.trim_start();
         let marker: String = t.chars().take_while(|&c| c == '`' || c == '~').collect();
@@ -56,8 +57,14 @@ fn parse(text: &str) -> Doc {
         if let Some(h) = t.strip_prefix('#') {
             let h = h.trim_start_matches('#');
             if h.starts_with(' ') || h.is_empty() {
-                // Inline code and link syntax read as their text in an anchor.
-                let text = h.replace('`', "");
+                // Inline code and link syntax read as their text in an anchor:
+                // `[the API](api.md)` is "the API"; closing `##` aren't text.
+                let h = h.trim_end();
+                let h = match h.trim_end_matches('#') {
+                    t if t.len() < h.len() && (t.is_empty() || t.ends_with(' ')) => t,
+                    _ => h,
+                };
+                let text = link.as_ref().map_or_else(|| h.to_string(), |r| r.replace_all(h, "$1").into_owned()).replace('`', "");
                 let mut s = slug(&text);
                 // Repeated headings get -1, -2 … like GitHub's.
                 let base = s.clone();
@@ -337,5 +344,11 @@ mod tests {
     fn repeated_headings_get_numbered_anchors() {
         let d = setup();
         assert!(matches!(go(d.path(), "# A\n## Notes\n## Notes\n[x](#notes-1)\n", &[]), Ok(Outcome::Pass(_))));
+    }
+
+    #[test]
+    fn closing_hashes_and_links_in_headings_read_as_github_does() {
+        let d = setup();
+        assert!(matches!(go(d.path(), "# A\n## Install ##\n## See [the API](https://x.example/api)\n## C# notes\n[a](#install) [b](#see-the-api) [c](#c-notes)\n", &[]), Ok(Outcome::Pass(_))));
     }
 }

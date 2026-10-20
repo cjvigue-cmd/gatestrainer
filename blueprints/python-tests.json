@@ -14,7 +14,7 @@
   },
   "prechecks": ["placeholder", "claims", "secrets"],
   "steps": [
-    "{{python}} -m unittest -q"
+    "{{gatestrainer}} --check ran --match '^Ran [1-9][0-9]* tests? in ' --match '^OK' -- {{python}} -m unittest -q"
   ],
   "pick": {
     "kind": "code",

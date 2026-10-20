@@ -129,6 +129,18 @@ fn same(a: Option<&Value>, b: Option<&Value>) -> bool {
         let coded = digits.len() > 1 && digits.starts_with('0') && digits.as_bytes().get(1).is_some_and(u8::is_ascii_digit);
         t.parse::<f64>().ok().filter(|f| f.is_finite() && !coded)
     };
+    // Whole numbers compare exactly: an f64 can't tell 9007199254740993
+    // from 9007199254740992, and an ID off by one is another record.
+    let whole = |t: &str| {
+        let t = t.trim();
+        let t = t.strip_suffix(".0").unwrap_or(t);
+        let digits = t.strip_prefix(['-', '+']).unwrap_or(t);
+        let coded = digits.len() > 1 && digits.starts_with('0');
+        (!digits.is_empty() && digits.bytes().all(|b| b.is_ascii_digit()) && !coded).then(|| t.parse::<i128>().ok()).flatten()
+    };
+    if let (Some(x), Some(y)) = (whole(&ta), whole(&tb)) {
+        return x == y;
+    }
     if let (Some(x), Some(y)) = (number(&ta), number(&tb)) {
         return x == y;
     }
@@ -291,6 +303,10 @@ mod tests {
         let zip = r("zip\n02134\n", Format::Csv);
         assert_eq!(compare(&zip, &r(r#"[{"zip": 2134}]"#, Format::Json), true).len(), 1, "a leading zero lost");
         assert!(compare(&zip, &r(r#"[{"zip": "02134"}]"#, Format::Json), true).is_empty());
+        let big = r("id\n12345678901234567891\n9007199254740993\n", Format::Csv);
+        assert_eq!(compare(&big, &r(r#"[{"id": "12345678901234567890"}, {"id": 9007199254740992}]"#, Format::Json), true).len(), 2, "big whole numbers compare exactly");
+        assert!(compare(&big, &r(r#"[{"id": "12345678901234567891"}, {"id": 9007199254740993}]"#, Format::Json), true).is_empty());
+        assert!(compare(&r("n\n120\n", Format::Csv), &r(r#"[{"n": 120.0}]"#, Format::Json), true).is_empty(), "120 and 120.0 are the same");
         assert!(compare(&r("x\n0.5\n", Format::Csv), &r(r#"[{"x": 0.50}]"#, Format::Json), true).is_empty(), "0.5 is a number");
     }
 

@@ -79,15 +79,17 @@ pub(crate) fn families_in(text: &str) -> Vec<usize> {
     out
 }
 
-/// A negation just before word `i` ("not all", "isn't free", "cannot always").
-fn negated(ws: &[(usize, usize, String)], i: usize) -> bool {
+/// A negation just before word `i` ("not all", "isn't free", "cannot
+/// always"), in the same sentence: "Setup isn't slow. Everything works"
+/// negates nothing about everything.
+fn negated(text: &str, ws: &[(usize, usize, String)], i: usize) -> bool {
     let neg = |w: &str| matches!(w, "not" | "no" | "cannot" | "without") || w.ends_with("n't");
-    (1..=2).any(|back| i >= back && neg(&ws[i - back].2))
+    (1..=2).any(|back| i >= back && neg(&ws[i - back].2) && !text[ws[i - back].1..ws[i].0].contains(['.', ';', ':', '!', '?']))
 }
 
 /// Byte spans of quotations in `text` that are in a source word for word.
 fn sourced_quotes(text: &str, sources: &[String]) -> Vec<(usize, usize)> {
-    let Ok(re) = Regex::new("\"([^\"\\n]+)\"|\u{201C}([^\u{201D}\\n]+)\u{201D}") else { return Vec::new() };
+    let Ok(re) = Regex::new(super::quote::INLINE) else { return Vec::new() };
     re.captures_iter(text)
         .filter_map(|c| c.get(1).or_else(|| c.get(2)))
         .filter(|m| sources.iter().any(|s| quote_in(s, m.as_str())))
@@ -112,7 +114,7 @@ pub(crate) fn overclaims(answer: &str, sources: &[String], allow: &[String]) -> 
         checked += 1;
         let (start, end) = (ws[i].0, ws[i + len - 1].1);
         let quoted = quotes.iter().any(|&(a, b)| start >= a && end <= b);
-        if !supported.contains(&f) && !allowed.contains(&f) && !quoted && !negated(&ws, i) {
+        if !supported.contains(&f) && !allowed.contains(&f) && !quoted && !negated(answer, &ws, i) {
             let line = answer[..start].matches('\n').count() + 1;
             let from = answer[..start].char_indices().rev().nth(30).map_or(0, |(p, _)| p);
             let to = answer[end..].char_indices().nth(30).map_or(answer.len(), |(p, _)| end + p);
@@ -186,5 +188,6 @@ mod tests {
         assert!(overclaims("This is always on.", &["x".into()], &["always".into()]).0.is_empty(), "--allow");
         assert_eq!(flagged("No one noticed; nothing broke.", "it worked"), ["No one", "nothing"]);
         assert_eq!(flagged("Coverage is 100% now.", "coverage rose to 90%"), ["100%"]);
+        assert_eq!(flagged("Setup isn't slow. Everything is supported.", "setup takes a minute; most things work"), ["Everything"], "a negation doesn't cross a sentence end");
     }
 }

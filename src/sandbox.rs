@@ -1008,11 +1008,17 @@ mod seccomp {
                 /* 8 */ jump(JEQ_K, socket, 1, 0),
                 /* 9 */ stmt(RET_K, RET_ALLOW),
                 /* 10 */ stmt(LD_W_ABS, OFF_ARG0_LO),
-                /* 11 */ jump(JEQ_K, libc::AF_INET as u32, 3, 0),
-                /* 12 */ jump(JEQ_K, libc::AF_INET6 as u32, 2, 0),
-                /* 13 */ jump(JEQ_K, libc::AF_PACKET as u32, 1, 0),
-                /* 14 */ stmt(RET_K, RET_ALLOW),
-                /* 15 */ stmt(RET_K, deny),
+                /* 11 */ jump(JEQ_K, libc::AF_INET as u32, 4, 0),
+                /* 12 */ jump(JEQ_K, libc::AF_INET6 as u32, 3, 0),
+                /* 13 */ jump(JEQ_K, libc::AF_PACKET as u32, 2, 0),
+                // A Unix socket reaches whatever listens on the machine —
+                // dockerd, the session bus — and Landlock doesn't govern
+                // connect(); the user's groups (docker …) can't be dropped
+                // unprivileged. socketpair(), a separate syscall that the
+                // interpreters use for their own child pipes, stays allowed.
+                /* 14 */ jump(JEQ_K, libc::AF_UNIX as u32, 1, 0),
+                /* 15 */ stmt(RET_K, RET_ALLOW),
+                /* 16 */ stmt(RET_K, deny),
             ];
             Some(Self { code })
         }

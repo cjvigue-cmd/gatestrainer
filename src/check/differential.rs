@@ -12,16 +12,15 @@ const SHOWN: usize = 10;
 /// Characters of a case or an output shown per line.
 const CLIP: usize = 120;
 
-/// What a command printed, or why it didn't run cleanly.
+/// What a command printed, or why it didn't run cleanly — including a
+/// program that can't start (missing, not executable): for the answer's
+/// side that's the answer's failure, for the reference the check's.
 fn run_side(cmd: &str, input: &str) -> Result<Result<String, String>, String> {
     let argv = shlex::split(cmd).filter(|a| !a.is_empty()).ok_or_else(|| format!("can't split {cmd:?} into a command"))?;
-    let mut child = Command::new(&argv[0])
-        .args(&argv[1..])
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
-        .map_err(|e| format!("{}: {e}", argv[0]))?;
+    let mut child = match Command::new(&argv[0]).args(&argv[1..]).stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::piped()).spawn() {
+        Ok(c) => c,
+        Err(e) => return Ok(Err(format!("`{cmd}` can't start: {}: {e}", argv[0]))),
+    };
     let mut stdin = child.stdin.take().ok_or("no stdin pipe")?;
     let text = input.to_string();
     // Written beside the read, so a large input can't deadlock on full pipes.
@@ -114,6 +113,8 @@ mod tests {
         // Quoted: temp folders can sit under a path with spaces.
         let cat = |p: &std::path::Path| format!("cat {}", shlex::try_quote(&p.to_string_lossy()).expect("quotable"));
         assert!(matches!(go(d.path(), &cat(&up), &cat(&up)), Ok(Outcome::Pass(_))));
+        assert!(matches!(go(d.path(), &cat(&up), "./no-such-answer-program"), Ok(Outcome::Fail(_))), "an answer that can't start is the answer's failure");
+        assert!(go(d.path(), "./no-such-reference-program", &cat(&up)).is_err(), "a reference that can't start is the check's");
         match go(d.path(), &cat(&up), &cat(&bad)) {
             Ok(Outcome::Fail(Fail(l))) => {
                 assert!(l[0].starts_with("1 of 3 cases differ"), "{l:?}");

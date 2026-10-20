@@ -17,8 +17,8 @@ const PYTHON: &str = r#"import json, re, sys
 d = json.load(sys.stdin)
 try:
     r = re.compile(d["pattern"])
-except re.error as e:
-    print(e, file=sys.stderr)
+except Exception as e:  # re.error, and OverflowError/RecursionError on absurd patterns
+    print(f"{type(e).__name__}: {e}", file=sys.stderr)
     sys.exit(3)
 f = r.fullmatch if d["full"] else r.search
 print(json.dumps([f(s) is not None for s in d["lines"]]))
@@ -43,7 +43,10 @@ process.stdin.on("end", () => {
 /// the answer's fault). `Err` is a broken check: no interpreter, bad output.
 fn matches(engine: &str, pattern: &str, full: bool, lines: &[&str]) -> Result<Result<Vec<bool>, String>, String> {
     if engine == "rust" {
-        let p = if full { format!("^(?:{pattern})$") } else { pattern.to_string() };
+        // Under a verbose flag `(?x)` a `#` comment would swallow the closing
+        // `)$`: a newline (whitespace there) ends the comment first.
+        let verbose = regex::Regex::new(r"\(\?[a-wyzA-Z]*x[a-zA-Z]*(?:-[a-zA-Z]*)?\)").is_ok_and(|v| v.is_match(pattern));
+        let p = if full { format!("^(?:{pattern}{})$", if verbose { "\n" } else { "" }) } else { pattern.to_string() };
         return Ok(match regex::Regex::new(&p) {
             Ok(r) => Ok(lines.iter().map(|l| r.is_match(l)).collect()),
             Err(e) => Err(e.to_string()),
@@ -167,6 +170,7 @@ mod tests {
         assert!(matches!(go("", "rust", true), Ok(Outcome::Fail(Fail(l))) if l[0] == "the pattern is empty"));
         assert!(matches!(go("a\nb", "rust", true), Ok(Outcome::Fail(Fail(l))) if l[0].contains("one line")));
         assert!(go("x", "perl", true).is_err());
+        assert!(matches!(go(r"(?x) \d{4}-\d{2}-\d{2}  # an ISO date", "rust", true), Ok(Outcome::Pass(_))), "a verbose comment can't swallow the anchor");
         assert!(run(&["--mode".into(), "exact".into()]).is_err());
     }
 
@@ -177,6 +181,7 @@ mod tests {
         if have("python3") {
             assert!(matches!(go(p, "python", false), Ok(Outcome::Pass(_))));
             assert!(matches!(go(r"\d{4}-(", "python", true), Ok(Outcome::Fail(Fail(l))) if l[0].starts_with("the pattern doesn't compile (python)")));
+            assert!(matches!(go("a{18446744073709551616}", "python", true), Ok(Outcome::Fail(Fail(l))) if l[0].starts_with("the pattern doesn't compile (python)")), "OverflowError is the pattern's fault");
         }
         if have("node") {
             assert!(matches!(go(p, "javascript", false), Ok(Outcome::Pass(_))));

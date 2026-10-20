@@ -23,8 +23,15 @@ const FORMATS: &[(&str, &str)] = &[
 ];
 
 /// A credential-looking name assigned a quoted literal (the value is checked
-/// for randomness separately): `api_key = "…"`, `"password": "…"`.
-const ASSIGNED: &str = r#"(?i)\b(?:api[_-]?key|secret(?:[_-]?key)?|access[_-]?token|auth[_-]?token|token|password|passwd|pwd|private[_-]?key|client[_-]?secret)["']?\s*[:=]\s*["']([^"'\s]{16,})["']"#;
+/// for randomness separately): `api_key = "…"`, `"password": "…"`, and
+/// with a prefix — `DB_PASSWORD`, `aws_secret_access_key`, `MY_API_KEY`.
+const ASSIGNED: &str = r#"(?i)(?:^|[^A-Za-z0-9])(?:[A-Za-z0-9]+[_-])*(?:api[_-]?key|secret(?:[_-]?access)?(?:[_-]?key)?|access[_-]?key|access[_-]?token|auth[_-]?token|token|password|passwd|pwd|private[_-]?key|client[_-]?secret)["']?\s*[:=]\s*["']([^"'\s]{16,})["']"#;
+
+/// The same in a `.env` file or a shell export: the value unquoted, to the
+/// end of the line (`API_KEY=Jq8v…`).
+/// Names in capitals, as `.env` files write them; a value with no brackets
+/// or dots (`token = tokenizer.encode(text)` is code, not a key).
+const ENV_ASSIGNED: &str = r#"^\s*(?:export\s+)?(?:[A-Z0-9]+_)*(?:API_?KEY|SECRET(?:_ACCESS)?(?:_KEY)?|ACCESS_KEY|ACCESS_TOKEN|AUTH_TOKEN|TOKEN|PASSWORD|PASSWD|PWD|PRIVATE_KEY|CLIENT_SECRET)\s*=\s*([^\s"'#()\[\].]{16,})\s*$"#;
 
 /// Shannon entropy per character: random keys are high, words are low.
 fn entropy(s: &str) -> f64 {
@@ -50,7 +57,7 @@ fn masked(s: &str) -> String {
 /// Every credential in `text`: (line, what it is, masked).
 pub(crate) fn secrets(text: &str) -> Vec<(usize, &'static str, String)> {
     let formats: Vec<(Regex, &str)> = FORMATS.iter().filter_map(|(p, w)| Regex::new(p).ok().map(|r| (r, *w))).collect();
-    let assigned = Regex::new(ASSIGNED).ok();
+    let assigned = [Regex::new(ASSIGNED).ok(), Regex::new(ENV_ASSIGNED).ok()];
     let mut out = Vec::new();
     for (i, line) in text.lines().enumerate() {
         if let Some((m, what)) = formats.iter().find_map(|(r, w)| r.find(line).map(|m| (m, *w))) {
@@ -59,7 +66,7 @@ pub(crate) fn secrets(text: &str) -> Vec<(usize, &'static str, String)> {
                 continue;
             }
         }
-        if let Some(c) = assigned.as_ref().and_then(|r| r.captures(line)) {
+        if let Some(c) = assigned.iter().flatten().find_map(|r| r.captures(line)) {
             let v = c.get(1).map_or("", |m| m.as_str());
             if !placeholder(v) && entropy(v) >= 3.5 {
                 out.push((i + 1, "a credential assigned in the code", masked(v)));
@@ -130,6 +137,12 @@ mod tests {
         assert_eq!(found[0].2, "sk-ant…", "only the first characters are shown");
         assert!(!report(&format!("x = '{ant}'"), "a.py").unwrap().contains(&ant[8..]), "the report doesn't repeat it");
         assert_eq!(kinds("password = \"Zq8#rT2!vB9@kL4$mN7p\""), ["a credential assigned in the code"]);
+        for line in ["DB_PASSWORD = \"h7GkQ2pZ9xLmW4vT8bNc\"", "aws_secret_access_key = \"wJalrXUtnFEMIK7MDENGbPxRfiCYzZ9q\"", "API_KEY=Jq8vR3mT6yW1zX9kL2pQ5sD7", "export GITHUB_TOKEN=Zq7vT2mR8yW4xK9pL3nQ6sD1"] {
+            assert_eq!(secrets(line).len(), 1, "{line}");
+        }
+        for code in ["token = tokenizer.encode(text)", "password = os.environ[\"DB_PASSWORD\"]", "API_KEY = settings.API_KEY_VALUE", "TOKEN=${GITHUB_TOKEN_FROM_CI}"] {
+            assert!(secrets(code).is_empty(), "{code}");
+        }
     }
 
     #[test]

@@ -15,6 +15,10 @@ pub(crate) fn parse_csv(text: &str) -> Result<Vec<Vec<String>>, String> {
         AfterQuote,
     }
     let text = text.strip_prefix('\u{feff}').unwrap_or(text);
+    // Blank lines at the end of the file (an editor's extra newline) aren't
+    // records; one in the middle of a table still is, and fails its width.
+    // (A line ending inside an unclosed quote is an error either way.)
+    let text = text.trim_end_matches(['\r', '\n']);
     let mut rows = Vec::new();
     let mut row = Vec::new();
     let mut field = String::new();
@@ -126,6 +130,11 @@ pub(crate) fn run(args: &[String]) -> Run {
     a.only(&["columns", "min-rows", "max-rows"])?;
     let cols = columns(a.need("columns")?)?;
     let (min_rows, max_rows) = (a.number::<usize>("min-rows")?, a.number::<usize>("max-rows")?);
+    if let (Some(lo), Some(hi)) = (min_rows, max_rows) {
+        if lo > hi {
+            return Err(format!("--min-rows {lo} is more than --max-rows {hi}: no table could pass"));
+        }
+    }
     let [file] = a.positional.as_slice() else {
         return Err("give exactly one CSV file".into());
     };
@@ -181,6 +190,8 @@ mod tests {
         assert_eq!(parse_csv(""), Ok(vec![]));
         assert_eq!(parse_csv("a,b\n1,2\n"), Ok(rows(&[&["a", "b"], &["1", "2"]])));
         assert_eq!(parse_csv("a,b\n1,2"), Ok(rows(&[&["a", "b"], &["1", "2"]])));
+        assert_eq!(parse_csv("a,b\n1,2\n\n\r\n"), Ok(rows(&[&["a", "b"], &["1", "2"]])), "blank lines at the end aren't records");
+        assert_eq!(parse_csv("a,b\n\n1,2\n"), Ok(rows(&[&["a", "b"], &[""], &["1", "2"]])), "one in the middle still is");
         assert_eq!(parse_csv("a,b\r\n1,2\r\n"), Ok(rows(&[&["a", "b"], &["1", "2"]])));
         assert_eq!(parse_csv(",x,\n"), Ok(rows(&[&["", "x", ""]])));
         let t = "name,note\n\"Smith, J\",\"said \"\"hi\"\"\nthen left\"\n";

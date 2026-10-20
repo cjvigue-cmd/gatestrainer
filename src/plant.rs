@@ -96,11 +96,25 @@ fn mutated(answer: &str) -> Vec<(String, String)> {
 /// sensible tolerance, and a number the source never had.
 fn renumbered(answer: &str) -> Option<(String, String)> {
     let re = Regex::new(r"-?\d+(?:\.\d+)?").ok()?;
-    let m = re.find_iter(answer).last()?;
-    let x: f64 = m.as_str().parse().ok()?;
-    let y = x * 2.0 + 7.0;
-    let to = if m.as_str().contains('.') { format!("{y}") } else { format!("{}", y as i64) };
-    Some((format!("{}{to}{}", &answer[..m.start()], &answer[m.end()..]), format!("{} → {to}", m.as_str())))
+    // The answer's own number: on an `answer:` line if there is one (what
+    // math-answer's gate reads), else the last one written. A remark after
+    // it ("rounded to 2 decimals") isn't the answer.
+    let answer_line = answer.lines().scan(0usize, |at, l| {
+        let start = *at;
+        *at += l.len() + 1;
+        Some((start, l))
+    })
+    .filter(|(_, l)| l.trim_start().to_ascii_lowercase().starts_with("answer:"))
+    .last();
+    let m = match answer_line {
+        Some((start, l)) => re.find_iter(l).last().map(|m| (start + m.start(), start + m.end(), m.as_str()))?,
+        None => re.find_iter(answer).last().map(|m| (m.start(), m.end(), m.as_str()))?,
+    };
+    let x: f64 = m.2.parse().ok()?;
+    // Doubled plus seven, except where that's the same value (-7).
+    let y = if (x * 2.0 + 7.0 - x).abs() < f64::EPSILON { x + 1.0 } else { x * 2.0 + 7.0 };
+    let to = if m.2.contains('.') { format!("{y}") } else { format!("{}", y as i64) };
+    Some((format!("{}{to}{}", &answer[..m.0], &answer[m.1..]), format!("{} → {to}", m.2)))
 }
 
 /// The answer with "not" inserted into its first quotation of two or more
@@ -384,6 +398,8 @@ mod tests {
         assert!(sql.iter().any(|(t, w)| t.ends_with("ASC") && w.contains("DESC")), "{sql:?}");
         assert_eq!(candidates("number", "Some working.\nanswer: 1157.625\n", "")[0].0, "Some working.\nanswer: 2322.25\n");
         assert_eq!(candidates("number", "about 3 cats", "")[0].1, "3 → 13");
+        assert_eq!(candidates("number", "answer: 42\nRounded to 2 decimals.\n", "")[0].0, "answer: 91\nRounded to 2 decimals.\n", "the answer line's number, not a remark after it");
+        assert_eq!(candidates("number", "answer: -7\n", "")[0].1, "-7 → -6", "-7 is its own double plus seven: a plant must change the value");
         let q = candidates("quote", "The report says “rats were removed in 2020” and more.", "");
         assert_eq!(q[0].0, "The report says “rats not were removed in 2020” and more.");
         assert!(candidates("quote", "no quotation here", "").is_empty());

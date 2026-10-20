@@ -158,7 +158,9 @@ impl GateSpec {
                     entry_file: PYTHON_ENTRY.into(),
                     support_files: HashMap::new(),
                     // stdlib only: discovers test*.py; no tests at all is exit 5.
-                    validation_command: format!("{} -m unittest -q", quote(&python)),
+                    // `ran`: the answer's code runs in the test process, so exit 0
+                    // alone could be its own `os._exit(0)`.
+                    validation_command: format!("{{{{gatestrainer}}}} --check ran --match '^Ran [1-9][0-9]* tests? in ' --match '^OK' -- {} -m unittest -q", quote(&python)),
                     steps: Vec::new(),
                     timeout_seconds: GATE_DEFAULT_TIMEOUT_SECS,
                     mem_limit_bytes: GATE_DEFAULT_MEM_BYTES,
@@ -174,7 +176,8 @@ impl GateSpec {
                     entry_file: JAVASCRIPT_ENTRY.into(),
                     support_files: HashMap::new(),
                     // Node's own runner: finds *.test.mjs and friends.
-                    validation_command: format!("{} --test", quote(&node)),
+                    // A file reported as a test by itself exited before its tests.
+                    validation_command: format!("{{{{gatestrainer}}}} --check ran --forbid '^✔ \\S+\\.test\\.[cm]?[jt]s\\b' -- {} --test", quote(&node)),
                     steps: Vec::new(),
                     timeout_seconds: GATE_DEFAULT_TIMEOUT_SECS,
                     mem_limit_bytes: GATE_DEFAULT_MEM_BYTES,

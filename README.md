@@ -4,7 +4,7 @@
 
 A model's claim that its answer is right counts for nothing. A check that runs and exits decides. Gatestrainer is a single program with three layers:
 
-1. **Checks.** Twenty-two primitive checks, each one deterministic, reading only the files it is given. `gatestrainer numeric --file answer.txt --pattern "answer: (\S+)" --expect 1157.625` exits 0 if the number is there and right, 1 if it isn't, with one problem per line on stderr written to be fed straight back to the model.
+1. **Checks.** Twenty-three primitive checks, each one deterministic, reading only the files it is given. `gatestrainer numeric --file answer.txt --pattern "answer: (\S+)" --expect 1157.625` exits 0 if the number is there and right, 1 if it isn't, with one problem per line on stderr written to be fed straight back to the model.
 2. **Gates.** A gate is files plus a command whose exit code decides, run in a fresh folder with a scrubbed environment, under a watchdog and whatever kernel isolation the OS offers (Landlock and seccomp on Linux, Job Objects on Windows, rlimits on macOS). The command comes from a model, so the gate treats it as hostile.
 3. **Blueprints and plants.** A blueprint is a gate described as JSON with named inputs, so a task names it instead of spelling a gate out. After a pass, the gate is also given a **planted false answer**, a wrong answer chosen by the program and never by the model. A gate that passes the plant is weak for that task, whatever it said about the answer.
 
@@ -50,6 +50,7 @@ Two kinds, and the difference is the point of this project.
 | `preserve` | every number, URL, code span, placeholder or heading level in the source appears in the result at least as often |
 | `records` | two data files (CSV, TSV, a JSON array of objects, JSON Lines) hold the same records: the same field names, values equal as text, numbers (`3.50` = `3.5`, but `02134` stays `02134`), true/false or both empty, in order unless `--order any` |
 | `grounded` | every value in a JSON answer is in the source: text word for word, numbers equal to ones written there (`1,249.50` grounds `1249.5`), ISO dates written there in any form; true/false/null and `--except` fields skipped |
+| `ran` | a test command exited 0 *and* its runner reported finishing (unittest's `Ran N tests` and `OK`, no file reported as its own test by `node --test`, a `test result:` for every test binary cargo starts): code that exits its own process mid-test can't pass. The code blueprints and presets run their tests through it |
 | `mesh` | an STL (ASCII or binary) is a closed solid, every edge on exactly two faces, with the expected bounding box and, if given, volume |
 
 **Lints.** A pass means the text shows none of the listed symptoms. These catch phrases, not substance, and a rephrased answer slips past. They're labelled so you never mistake one for a proof.
@@ -79,7 +80,7 @@ Protection is layered, and every result says which layer applied:
 | rlimits: `NPROC`, `FSIZE`, `CPU`, `CORE` | ✔ | ✔ | | fork bombs at the kernel, disk filling |
 | Job Object: per-tree process limit, memory limit, kill-on-close | | | ✔ | fork bombs and memory bombs at the kernel |
 | Landlock: reads only in the sandbox, system folders and the toolchain; writes only in the sandbox; TCP denied (kernel ≥ 5.13; network needs ≥ 6.7) | ✔ | | | reading secrets on disk, `rm -rf ~`, writes elsewhere |
-| seccomp: no IPv4, IPv6 or packet sockets, no io_uring | ✔ | | | exfiltration over UDP or TCP |
+| seccomp: no IPv4, IPv6, packet or Unix sockets, no io_uring | ✔ | | | exfiltration over UDP or TCP; reaching dockerd or the session bus through a Unix socket |
 
 The watchdog is the portable contract; the kernel layers are extra. `GATESTRAINER_REQUIRE_FS_ISOLATION=1` refuses to run when Landlock is unavailable instead of degrading.
 

@@ -24,6 +24,7 @@ pub(crate) mod date;
 pub(crate) mod secrets;
 mod preserve;
 mod quote;
+mod ran;
 mod records;
 mod regex;
 mod resolve;
@@ -110,6 +111,10 @@ gatestrainer <primitive> [options]   (exit 0 pass, 1 fail, 2 bad check)
           curly quotes and spacing aside), numbers equal to one written there
           (1,249.50 grounds 1249.5), YYYY-MM-DD dates written there in any form;
           true/false/null and --except fields (derived ones) skipped
+  ran     [--match RE]... [--forbid RE]... [--each START --done END] -- CMD [ARG]...
+          CMD exits 0 and its runner reported finishing: every --match line
+          appears, no --forbid line does, each --each line is followed by a
+          --done line (code that exits the process mid-test can't pass)
   records --source S --file F [--source-format FMT] [--format FMT] [--order keep|any]
           F holds the same records as S (formats csv, tsv, json = an array of
           objects, jsonl; by extension unless given): same field names, values
@@ -162,6 +167,7 @@ pub fn cli(args: &[String]) -> i32 {
         "date" => date::run(rest),
         "regex" => regex::run(rest),
         "records" => records::run(rest),
+        "ran" => ran::run(rest),
         "grounded" => grounded::run(rest),
         "mesh" => mesh::run(rest),
         other => Err(format!("unknown check `{other}`\n\n{USAGE}")),
@@ -257,6 +263,14 @@ impl Args {
 
 /// Read an artifact file: missing or unreadable is the artifact's failure,
 /// not the check's.
+/// A minus sign just before byte `start` of `text` belongs to the number
+/// there (`-5`, `(−5)`, `fell by -5`), not to a word or a range (`x-5`,
+/// `10-20`, `2026-10-20`).
+pub(crate) fn signed_at(text: &str, start: usize) -> bool {
+    let mut before = text[..start].chars().rev();
+    matches!(before.next(), Some('-' | '\u{2212}')) && !before.next().is_some_and(char::is_alphanumeric)
+}
+
 pub(crate) fn read_artifact(path: &str) -> Result<String, Fail> {
     std::fs::read_to_string(Path::new(path)).map_err(|e| Fail(vec![format!("{path}: can't be read ({e})")]))
 }
@@ -267,6 +281,13 @@ mod tests {
 
     fn s(v: &[&str]) -> Vec<String> {
         v.iter().map(|x| x.to_string()).collect()
+    }
+
+    #[test]
+    fn a_minus_sign_belongs_to_a_number_only_after_a_space_or_bracket() {
+        let at = |t: &str, n: &str| signed_at(t, t.rfind(n).expect("in text"));
+        assert!(at("fell by -5 percent", "5") && at("(\u{2212}12)", "12") && at("-3", "3"));
+        assert!(!at("pages 10-20", "20") && !at("2026-10-20", "20") && !at("x-5", "5") && !at("rose 5", "5"));
     }
 
     #[test]

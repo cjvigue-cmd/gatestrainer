@@ -76,7 +76,7 @@ pub(crate) struct Found {
 
 fn pattern() -> Result<Regex, String> {
     let p = format!(
-        r"(?i)\b(?:{WEEKDAY})?(?:(\d{{4}})-(\d{{2}})-(\d{{2}})\b|{MONTH}\s+{DAY},?\s+(\d{{4}})\b|(?:the\s+)?{DAY}\s+(?:of\s+)?{MONTH},?\s+(\d{{4}})\b|(\d{{1,2}})/(\d{{1,2}})/(\d{{4}})\b)"
+        r"(?i)\b(?:{WEEKDAY})?(?:(\d{{4}})-(\d{{2}})-(\d{{2}})(?:\b|T\d)|{MONTH}\s+{DAY},?\s+(\d{{4}})\b|(?:the\s+)?{DAY}\s+(?:of\s+)?{MONTH},?\s+(\d{{4}})\b|(\d{{1,2}})/(\d{{1,2}})/(\d{{4}})\b)"
     );
     Regex::new(&p).map_err(|e| e.to_string())
 }
@@ -114,7 +114,13 @@ pub(crate) fn dates(text: &str, order: Option<Order>) -> Result<Vec<Found>, Stri
                 },
                 None => None,
             };
-            let text = c.get(0).map_or("", |m| m.as_str()).trim_end_matches([',', ' ']).to_string();
+            // An ISO date-time's `T` and first hour digit aren't the date's.
+            let whole = c.get(0).map_or("", |m| m.as_str());
+            let whole = match whole.char_indices().rev().nth(1) {
+                Some((i, 'T' | 't')) if c.get(2).is_some() => &whole[..i],
+                _ => whole,
+            };
+            let text = whole.trim_end_matches([',', ' ']).to_string();
             out.push(Found { line: i + 1, text, ymd, weekday });
         }
     }
@@ -251,7 +257,14 @@ pub(crate) fn run(args: &[String]) -> Run {
 /// YYYY-MM-DD: a planted false answer. (text, what was changed)
 pub(crate) fn shifted(answer: &str) -> Option<(String, String)> {
     let found = dates(answer, None).ok()?;
-    let (f, (y, m, d)) = found.iter().find_map(|f| f.ymd.filter(|&(y, m, d)| valid(y, m, d)).map(|ymd| (f, ymd)))?;
+    // The answer's own date: the one on a `date:` line, else the last one
+    // written — not the question's date restated at the top, which the
+    // gate rightly ignores (a plant there "passes" and blames the gate).
+    let lines: Vec<&str> = answer.lines().collect();
+    let on_date_line = |f: &&Found| lines.get(f.line - 1).is_some_and(|l| l.trim_start().to_ascii_lowercase().starts_with("date:"));
+    let usable = |f: &&Found| f.ymd.is_some_and(|(y, m, d)| valid(y, m, d));
+    let f = found.iter().filter(usable).find(on_date_line).or_else(|| found.iter().rfind(usable))?;
+    let (y, m, d) = f.ymd?;
     let next = if valid(y, m, d + 1) {
         (y, m, d + 1)
     } else if m < 12 {
@@ -259,7 +272,15 @@ pub(crate) fn shifted(answer: &str) -> Option<(String, String)> {
     } else {
         (y + 1, 1, 1)
     };
-    Some((answer.replacen(&f.text, &iso(next), 1), format!("{} → {}", f.text, iso(next))))
+    // Replaced on its own line, so the same date written earlier stays.
+    let mut out: Vec<String> = lines.iter().map(|l| l.to_string()).collect();
+    let line = out.get_mut(f.line - 1)?;
+    *line = line.replacen(&f.text, &iso(next), 1);
+    let mut text = out.join("\n");
+    if answer.ends_with('\n') {
+        text.push('\n');
+    }
+    Some((text, format!("{} → {}", f.text, iso(next))))
 }
 
 /// "Thursday, October 8, 2026".
@@ -301,6 +322,8 @@ mod tests {
         assert!(ymds("version 1.2.3, 3 apples, May I ask", None).is_empty());
         let f = &dates("Fri, Oct 8, 2026", None).unwrap_or_default()[0];
         assert_eq!((f.weekday, f.text.as_str()), (Some(4), "Fri, Oct 8, 2026"));
+        assert_eq!(ymds("{\"due\":\"2026-10-08T00:00:00Z\"}", None), [Some((2026, 10, 8))], "an ISO date-time");
+        assert_eq!(dates("at 2026-02-30T09:00Z", None).unwrap_or_default()[0].text, "2026-02-30");
     }
 
     #[test]
@@ -309,6 +332,9 @@ mod tests {
         assert_eq!(shifted("Due Thursday, October 8, 2026.").map(|s| s.0).as_deref(), Some("Due 2026-10-09."));
         assert_eq!(shifted("February 28, 2026").map(|s| s.0).as_deref(), Some("2026-03-01"));
         assert!(shifted("10/08/2026, no other date").is_none());
+        let a = "Thirty days after Thursday, October 8, 2026 is a Saturday.\ndate: November 7, 2026\n";
+        assert_eq!(shifted(a).map(|s| s.0).as_deref(), Some("Thirty days after Thursday, October 8, 2026 is a Saturday.\ndate: 2026-11-08\n"), "the answer's date, not the question's");
+        assert_eq!(shifted("From 2026-10-08 to 2026-10-08.\n2026-10-08").map(|s| s.0).as_deref(), Some("From 2026-10-08 to 2026-10-08.\n2026-10-09"), "the last one, on its own line");
     }
 
     #[test]

@@ -34,7 +34,7 @@
   },
   "prechecks": ["placeholder", "claims", "secrets"],
   "steps": [
-    "{{node}} --test solution.test.mjs",
+    "{{gatestrainer}} --check ran --forbid '^✔ \\S+\\.test\\.[cm]?[jt]s\\b' -- {{node}} --test solution.test.mjs",
     "{{gatestrainer}} --check differential --cases {{cases}} --left \"{{node}} differ.mjs original {{call}}\" --right \"{{node}} differ.mjs solution {{call}}\""
   ],
   "pick": {

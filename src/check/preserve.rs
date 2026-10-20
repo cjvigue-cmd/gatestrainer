@@ -18,16 +18,24 @@ fn count<'a>(items: impl Iterator<Item = &'a str>) -> BTreeMap<&'a str, usize> {
     m
 }
 
-/// Numbers standing alone (not part of `x2` or `v1_2`): `42`, `3.14`, `1,000`.
-fn numbers(text: &str) -> Vec<&str> {
+/// Numbers standing alone (not part of `x2` or `v1_2`): `42`, `3.14`,
+/// `1,000`, with their sign (`-40`; a typographic minus written `-`), so a
+/// sign flipped in the edit is a changed number.
+fn numbers(text: &str) -> Vec<String> {
     let re = match Regex::new(r"\d+(?:[.,]\d+)*") {
         Ok(r) => r,
         Err(_) => return Vec::new(),
     };
     let word = |c: Option<char>| c.is_some_and(|c| c.is_alphanumeric() || c == '_');
     re.find_iter(text)
-        .filter(|m| !word(text[..m.start()].chars().next_back()) && !word(text[m.end()..].chars().next()))
-        .map(|m| m.as_str())
+        .filter(|m| !word(text[m.end()..].chars().next()))
+        .filter_map(|m| {
+            if super::signed_at(text, m.start()) {
+                Some(format!("-{}", m.as_str()))
+            } else {
+                (!word(text[..m.start()].chars().next_back())).then(|| m.as_str().to_string())
+            }
+        })
         .collect()
 }
 
@@ -123,9 +131,10 @@ pub(crate) fn run(args: &[String]) -> Run {
     for kind in &keep {
         match *kind {
             "numbers" => {
-                let f = count(numbers(&from).into_iter());
+                let (nf, nt) = (numbers(&from), numbers(&to));
+                let f = count(nf.iter().map(String::as_str));
                 checked += f.values().sum::<usize>();
-                missing("number", f, &count(numbers(&to).into_iter()), &mut bad);
+                missing("number", f, &count(nt.iter().map(String::as_str)), &mut bad);
             }
             "urls" => {
                 let f = count(urls(&from).into_iter());
@@ -175,6 +184,7 @@ mod tests {
     #[test]
     fn extractors() {
         assert_eq!(numbers("v2 has 3 parts, 4.25% and 1,000 items; x_9 no"), ["3", "4.25", "1,000"]);
+        assert_eq!(numbers("fell to -40 (\u{2212}12) over 10-20 days on 2026-10-20"), ["-40", "-12", "10", "20", "2026", "10", "20"], "signs kept; hyphens in ranges and dates aren't signs");
         assert_eq!(urls("see https://a.b/c?d=1. and (http://x.y/z)"), ["https://a.b/c?d=1", "http://x.y/z"]);
         assert_eq!(code("use `f()` here\n```sh\nrun it\n```\n"), ["f()", "run it"]);
         assert_eq!(placeholders("Hi {name}, {{ count }} %s %(user)s ${x}"), ["{name}", "{{ count }}", "%s", "%(user)s", "${x}"]);

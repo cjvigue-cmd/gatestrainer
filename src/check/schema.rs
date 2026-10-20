@@ -93,7 +93,7 @@ fn check_schema(schema: &Value, at: &str, c: &mut Checked) -> Result<(), String>
             }
             "pattern" => {
                 let Some(p) = v.as_str() else { return bad("must be a string") };
-                let re = Regex::new(p).map_err(|e| format!("{here}: {e}"))?;
+                let re = Regex::new(&ecma_classes(p)).map_err(|e| format!("{here}: {e}"))?;
                 c.patterns.insert(p.to_string(), re);
             }
             other => return Err(format!("{at}: unsupported keyword `{other}` (supported: type, properties, required, additionalProperties, items, enum, const, minimum, maximum, exclusiveMinimum, exclusiveMaximum, minLength, maxLength, minItems, maxItems, uniqueItems, pattern)")),
@@ -236,6 +236,33 @@ fn object(map: &Map<String, Value>, obj: &Map<String, Value>, ptr: &str, here: &
     }
 }
 
+/// JSON Schema patterns are ECMA-262 regular expressions, where `\d` and
+/// `\w` are ASCII only; the regex crate's are Unicode (`\d` matches "١٢٣").
+/// Written as the ASCII classes they mean, inside a class too (`[\d.]` →
+/// `[[0-9].]`, a nested class the regex crate reads).
+fn ecma_classes(p: &str) -> String {
+    let mut out = String::with_capacity(p.len());
+    let mut chars = p.chars();
+    while let Some(c) = chars.next() {
+        if c != '\\' {
+            out.push(c);
+            continue;
+        }
+        match chars.next() {
+            Some('d') => out.push_str("[0-9]"),
+            Some('D') => out.push_str("[^0-9]"),
+            Some('w') => out.push_str("[0-9A-Za-z_]"),
+            Some('W') => out.push_str("[^0-9A-Za-z_]"),
+            Some(n) => {
+                out.push('\\');
+                out.push(n);
+            }
+            None => out.push('\\'),
+        }
+    }
+    out
+}
+
 pub(crate) fn run(args: &[String]) -> Run {
     let a = Args::parse(args, &[])?;
     a.only(&["schema"])?;
@@ -249,7 +276,7 @@ pub(crate) fn run(args: &[String]) -> Run {
         Ok(t) => t,
         Err(f) => return Ok(Outcome::Fail(f)),
     };
-    let doc: Value = match serde_json::from_str(&text) {
+    let doc: Value = match serde_json::from_str(text.strip_prefix('\u{feff}').unwrap_or(&text)) {
         Ok(d) => d,
         Err(e) => return Ok(Outcome::Fail(Fail(vec![format!("{file}: not valid JSON: {e}")]))),
     };
@@ -348,6 +375,8 @@ mod tests {
         assert_eq!(errs(s.clone(), json!("abcd")).len(), 1);
         assert_eq!(errs(s, json!("ABC")).len(), 1);
         assert!(errs(json!({"pattern": "b"}), json!("abc")).is_empty(), "a search, not anchored");
+        assert_eq!(errs(json!({"pattern": "^\\d+$"}), json!("\u{0661}\u{0662}\u{0663}")).len(), 1, "\\d is ASCII digits, as in ECMA-262");
+        assert!(errs(json!({"pattern": "^[\\d.]+$"}), json!("1.25")).is_empty() && errs(json!({"pattern": "^\\w+\\\\d$"}), json!("a_1\\d")).is_empty(), "inside a class, and an escaped backslash");
     }
     #[test]
     fn arrays() {

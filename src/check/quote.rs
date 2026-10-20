@@ -8,6 +8,10 @@ use super::{read_artifact, Args, Fail, Outcome, Run};
 use super::text::quote_in;
 use regex::Regex;
 
+/// An inline quotation, "…" or “…”, on one line or wrapped onto the next
+/// (a line break inside, never a blank line).
+pub(crate) const INLINE: &str = "\"((?:[^\"\\n]|\\n[^\"\\n])+)\"|\u{201C}((?:[^\u{201D}\\n]|\\n[^\u{201D}\\n])+)\u{201D}";
+
 /// Below this many words a quoted span isn't treated as a quotation.
 const MIN_WORDS: usize = 4;
 
@@ -21,19 +25,32 @@ fn quotations(text: &str) -> Vec<String> {
             block.clear();
         }
     };
-    let Ok(inline) = Regex::new("\"([^\"\\n]+)\"|\u{201C}([^\u{201D}\\n]+)\u{201D}") else { return out };
+    // A quotation may wrap onto the next line, never across a blank one.
+    let Ok(inline) = Regex::new(INLINE) else { return out };
+    let mut run: Vec<&str> = Vec::new();
+    let take = |run: &mut Vec<&str>, out: &mut Vec<String>| {
+        let joined = run.join("\n");
+        for c in inline.captures_iter(&joined) {
+            if let Some(m) = c.get(1).or_else(|| c.get(2)) {
+                out.push(m.as_str().split_whitespace().collect::<Vec<_>>().join(" "));
+            }
+        }
+        run.clear();
+    };
     for line in text.lines() {
         if let Some(q) = line.trim_start().strip_prefix('>') {
+            take(&mut run, &mut out);
             block.push(q.trim().to_string());
             continue;
         }
         flush(&mut block, &mut out);
-        for c in inline.captures_iter(line) {
-            if let Some(m) = c.get(1).or_else(|| c.get(2)) {
-                out.push(m.as_str().to_string());
-            }
+        if line.trim().is_empty() {
+            take(&mut run, &mut out);
+        } else {
+            run.push(line);
         }
     }
+    take(&mut run, &mut out);
     flush(&mut block, &mut out);
     // Trailing punctuation inside the quote marks is the writer's, not the source's.
     out.into_iter()
@@ -85,6 +102,8 @@ mod tests {
     fn finds_quotations() {
         let t = "It said \"the bridge was structurally sound.\" Some call it \"safe\".\n> Repairs will begin\n> in March\nand “last six weeks” too.";
         assert_eq!(quotations(t), ["the bridge was structurally sound", "Repairs will begin in March"]);
+        assert_eq!(quotations("It says \"the drug cures every\nknown cancer in humans\"."), ["the drug cures every known cancer in humans"], "a quotation wrapped onto the next line");
+        assert!(quotations("A \"stray mark in one paragraph\n\nand another\" in the next.").is_empty(), "never across a blank line");
     }
 
     fn go(text: &str, extra: &[&str]) -> Run {

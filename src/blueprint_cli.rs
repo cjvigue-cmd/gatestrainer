@@ -54,9 +54,22 @@ impl Cases {
     /// # Errors
     /// Not JSON, an unknown key, a missing `good` or `bad`, an unreadable file.
     pub fn parse(text: &str, base: &Path) -> Result<Self, String> {
+        // `cases.json` given bare has the empty path as its folder.
+        let base = if base.as_os_str().is_empty() { Path::new(".") } else { base };
+        // Only files beside the case file: a case file may come from someone
+        // else, and an answer "read from" `../../.ssh/id_rsa` would carry
+        // that file into a gate.
         Self::parse_with(text, &|rel: &str| {
+            let inside = !rel.is_empty() && Path::new(rel).components().all(|c| matches!(c, std::path::Component::Normal(_)));
+            if !inside {
+                return Err(format!("{rel:?}: a file beside the case file (a relative path with no `..`)"));
+            }
             let path = base.join(rel);
-            std::fs::read_to_string(&path).map_err(|e| format!("{}: {e}", path.display()))
+            let (real, root) = (std::fs::canonicalize(&path).map_err(|e| format!("{}: {e}", path.display()))?, std::fs::canonicalize(base).map_err(|e| format!("{}: {e}", base.display()))?);
+            if !real.starts_with(&root) {
+                return Err(format!("{rel:?} leads outside the case file's folder (a link?)"));
+            }
+            std::fs::read_to_string(&real).map_err(|e| format!("{}: {e}", path.display()))
         })
     }
 
@@ -373,6 +386,8 @@ mod tests {
             (json!({ "good": ["a"], "bad": ["b"], "expected": 1 }), "unknown key"),
             (json!({ "good": [{ "file": "missing.txt" }], "bad": ["b"] }), "missing.txt"),
             (json!(["a"]), "JSON object"),
+            (json!({ "good": [{ "file": "../outside.txt" }], "bad": ["b"] }), "no `..`"),
+            (json!({ "good": [{ "file": "/etc/hostname" }], "bad": ["b"] }), "no `..`"),
         ] {
             let e = Cases::parse(&bad.to_string(), d.path()).expect_err("refused");
             assert!(e.contains(want), "{bad}: {e}");
@@ -412,8 +427,8 @@ mod tests {
     }
 
     /// Every built-in case file (`blueprints/cases/NAME.json`) goes as
-    /// expected — those whose gate needs no `{{gatestrainer}}` (in a test run
-    /// this binary is the test harness); the demo runs the rest.
+    /// expected, through the real gate (`{{gatestrainer}}` is the crate's
+    /// built binary in a test run: `runner::self_for_gates`).
     #[cfg(unix)]
     #[tokio::test]
     async fn built_in_case_files() {
@@ -426,9 +441,6 @@ mod tests {
         for path in std::fs::read_dir(&dir).expect("cases dir").flatten().map(|e| e.path()).filter(|p| p.extension().is_some_and(|x| x == "json")) {
             let name = path.file_stem().and_then(|s| s.to_str()).expect("name").to_string();
             let bp = blueprint::find(&name, None).unwrap_or_else(|e| panic!("{}: {e}", path.display()));
-            if bp.steps.iter().any(|s| s.contains("{{gatestrainer}}")) {
-                continue;
-            }
             // A blueprint whose tool this machine lacks (node for the
             // JavaScript and TypeScript ones) is skipped, not failed.
             let bin = |t: &'static str| if t == "python" { "python3" } else { t };

@@ -200,12 +200,20 @@ impl Blueprint {
                 _ => {}
             }
             if let Some(d) = &input.default {
+                // Rule 2's independent input has to come from the caller: a
+                // default (an empty test file) would make "full" rest on nothing.
+                if input.independent {
+                    return Err(format!("input `{name}` is independent, so the caller gives it: no default"));
+                }
                 value_of(name, input, d)?;
             }
         }
-        paths.sort_unstable();
-        if let Some(w) = paths.windows(2).find(|w| w[0] == w[1]) {
-            return Err(format!("{:?} is written twice (entry_file, files and file inputs must differ)", w[0]));
+        // `sub//a.txt` and `sub/a.txt` are one file, and `A.txt` and `a.txt`
+        // are one on Windows and macOS: compared as the file system sees them.
+        let mut keys: Vec<(String, &str)> = paths.iter().map(|p| (Path::new(p).components().map(|c| c.as_os_str().to_string_lossy().to_lowercase()).collect::<Vec<_>>().join("/"), *p)).collect();
+        keys.sort_unstable();
+        if let Some(w) = keys.windows(2).find(|w| w[0].0 == w[1].0) {
+            return Err(format!("{:?} and {:?} are the same file (entry_file, files and file inputs must differ)", w[0].1, w[1].1));
         }
         // Rule 3: every placeholder names a declared input (or a program, in
         // a step), and every input is used.
@@ -258,7 +266,9 @@ impl Blueprint {
     fn kind(&self) -> GateKind {
         // A render by OpenSCAD makes the artifact the checks then measure
         // (an STL's bounding box): still a measurement of the thing itself.
-        if self.steps.iter().all(|s| s.trim_start().starts_with("{{gatestrainer}} --check ") || s.trim_start().starts_with("{{openscad}} ")) {
+        // A `--check ran` step runs the caller's tests: tests, not a measurement.
+        let measures = |s: &str| (s.starts_with("{{gatestrainer}} --check ") && !s.starts_with("{{gatestrainer}} --check ran ")) || s.starts_with("{{openscad}} ");
+        if self.steps.iter().all(|s| measures(s.trim_start())) {
             GateKind::Mechanical
         } else if self.inputs.values().any(|i| i.independent) {
             GateKind::Tests
@@ -501,7 +511,9 @@ mod tests {
         let r = find("rust-tests", None).expect("built in").expand(&obj(json!({ "tests": "#[test] fn t() {}" }))).expect("expand");
         assert_eq!(r.gate.support_files["tests/hidden.rs"], "use task::*;\n#[test] fn t() {}");
         assert_eq!(r.gate.kind, GateKind::Tests);
-        assert!(!r.gate.validation_command.contains("{{"), "{}", r.gate.validation_command);
+        let rest = r.gate.validation_command.replace("{{gatestrainer}}", "");
+        assert!(!rest.contains("{{"), "only {{gatestrainer}} is left for the gate runner: {}", r.gate.validation_command);
+        assert!(r.gate.validation_command.starts_with("{{gatestrainer}} --check ran "), "the tests must report finishing: {}", r.gate.validation_command);
         let c = find("csv-table", None).expect("built in").expand(&obj(json!({ "columns": "a:int,b:str --max-rows 0" }))).expect("expand");
         assert!(c.gate.validation_command.contains("'a:int,b:str --max-rows 0'"), "a value stays one argument: {}", c.gate.validation_command);
         assert_eq!(c.proves, Proves::Partial);
@@ -548,7 +560,9 @@ mod tests {
         assert!(with("files", json!({ "a.txt": "{{gatestrainer}}" })).is_err(), "program placeholders are for steps");
         // Paths stay inside and don't collide.
         assert!(with("entry_file", json!("../x")).is_err());
-        assert!(with("files", json!({ "out.txt": "x" })).is_err_and(|e| e.contains("twice")));
+        assert!(with("files", json!({ "out.txt": "x" })).is_err_and(|e| e.contains("same file")));
+        assert!(with("files", json!({ "OUT.txt": "x" })).is_err_and(|e| e.contains("same file")), "one file on Windows and macOS");
+        assert!(with("inputs", json!({ "want": { "kind": "number", "about": "x", "independent": true, "default": 0 } })).is_err_and(|e| e.contains("no default")), "an independent input comes from the caller");
         assert!(with("steps", json!([])).is_err());
         assert!(with("name", json!("Bad Name")).is_err());
         assert!(with("timeout_seconds", json!(0)).is_err());

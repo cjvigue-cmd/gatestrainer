@@ -28,7 +28,10 @@ impl Sources {
     fn read(texts: &[String]) -> Result<Self, String> {
         let joined = texts.join("\n");
         let number = regex::Regex::new(r"\d[\d,]*(?:\.\d+)?").map_err(|e| e.to_string())?;
-        let numbers = number.find_iter(&joined).filter_map(|m| m.as_str().replace(',', "").parse::<f64>().ok()).collect();
+        let numbers = number
+            .find_iter(&joined)
+            .filter_map(|m| m.as_str().replace(',', "").parse::<f64>().ok().map(|n| if super::signed_at(&joined, m.start()) { -n } else { n }))
+            .collect();
         let mut dates = Vec::new();
         // A slash date reads two ways: either reading grounds a value.
         for order in [None, Some(super::date::Order::Mdy), Some(super::date::Order::Dmy)] {
@@ -40,17 +43,7 @@ impl Sources {
     /// `value` (already `norm`ed) occurs with no letter or digit glued to
     /// either end.
     fn has_words(&self, value: &str) -> bool {
-        if value.is_empty() {
-            return true;
-        }
-        let glued = |c: Option<char>| c.is_some_and(char::is_alphanumeric);
-        let first_glues = value.chars().next().is_some_and(char::is_alphanumeric);
-        let last_glues = value.chars().last().is_some_and(char::is_alphanumeric);
-        self.text.match_indices(value).any(|(at, m)| {
-            let before = self.text[..at].chars().last();
-            let after = self.text[at + m.len()..].chars().next();
-            !(first_glues && glued(before)) && !(last_glues && glued(after))
-        })
+        super::text::has_words(&self.text, value)
     }
 
     fn has_number(&self, n: f64) -> bool {
@@ -182,6 +175,9 @@ mod tests {
         assert_eq!(found(json!({"due": "2026-11-30"}), &[]), ["$.due: 2026-11-30 isn't a date written in the source"]);
         assert_eq!(found(json!({"items": [{"quantity": 4}]}), &[]), ["$.items[0].quantity: 4 isn't a number written in the source"]);
         assert_eq!(found(json!({"vendor": "Acm"}), &[]).len(), 1, "a piece of a word isn't the word");
+        let fell = |v: Value| problems(&v, &["Sales fell by -5 percent over 10-20 days.".to_string()], &[]).expect("reads").0;
+        assert!(fell(json!({"change": -5, "days": 20})).is_empty(), "a sign as written; a range's hyphen isn't one");
+        assert_eq!(fell(json!({"change": 5})).len(), 1, "a flipped sign isn't grounded");
         assert_eq!(found(json!({"currency": "USD", "vendor": "Acme"}), &["currency"]), Vec::<String>::new(), "--except skips derived fields");
     }
 

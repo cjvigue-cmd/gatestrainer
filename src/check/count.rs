@@ -17,6 +17,11 @@ pub(crate) fn run(args: &[String]) -> Run {
     if eq.is_some() && (min.is_some() || max.is_some()) {
         return Err("--eq can't be combined with --min/--max".into());
     }
+    if let (Some(lo), Some(hi)) = (min, max) {
+        if lo > hi {
+            return Err(format!("--min {lo} is more than --max {hi}: no count could pass"));
+        }
+    }
     if eq.is_none() && min.is_none() && max.is_none() {
         return Err("give --eq N, or --min N and/or --max N".into());
     }
