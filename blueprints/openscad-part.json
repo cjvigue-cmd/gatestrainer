@@ -1,0 +1,40 @@
+{
+  "name": "openscad-part",
+  "task": "3D part (CAD)",
+  "about": "An OpenSCAD model (model.scad) that renders to a closed solid whose bounding box is your size X,Y,Z in millimetres (within tol; in that axis order unless orientation is any) and, if you give it, whose volume is yours within vol_tol. Measured on the rendered STL, not read from the source. Proves the part renders, is printable as a solid and has the right envelope and amount of material; not that every feature sits in the right place.",
+  "proves": "partial",
+  "entry_file": "model.scad",
+  "instructions": "Reply with model.scad only: one solid part, units millimetres, no include, use or import of other files. Give round features $fn = 64 or more. Keep bodies overlapping, not just touching, so the result is one closed solid.",
+  "inputs": {
+    "size": {
+      "kind": "text",
+      "about": "the bounding box in mm as X,Y,Z, e.g. 60,40,4",
+      "independent": true
+    },
+    "tol": {
+      "kind": "number",
+      "about": "how far each side may be from size, in mm",
+      "default": 0.05
+    },
+    "orientation": {
+      "kind": "text",
+      "about": "fixed (X,Y,Z in that order) or any (the three sides in any order)",
+      "default": "fixed"
+    },
+    "volume": {
+      "kind": "text",
+      "about": "the part's volume in mm³, computed by you (empty: not checked); catches a missing hole or a pocket that doesn't go through",
+      "default": ""
+    },
+    "vol_tol": {
+      "kind": "number",
+      "about": "relative tolerance on volume; round features drawn with facets lose a little",
+      "default": 0.01
+    }
+  },
+  "steps": [
+    "{{openscad}} -o model.stl model.scad",
+    "{{gatestrainer}} --check mesh --file model.stl --size {{size}} --tol {{tol}} --orientation {{orientation}} --volume {{volume}} --vol-tol {{vol_tol}}"
+  ],
+  "timeout_seconds": 180
+}

@@ -1,0 +1,32 @@
+{
+  "name": "extract-json",
+  "task": "summarize / extract",
+  "about": "Fields pulled from your document (source.txt) into JSON (out.json) that fits your schema, with every value found in the document: text word for word, numbers equal to ones written there, YYYY-MM-DD dates written there in any form. Fields you name in `except` (a category you defined, a currency code) are derived, so skipped. Proves the shape and that nothing was invented, not that each value sits in the right field.",
+  "proves": "partial",
+  "entry_file": "out.json",
+  "instructions": "Reply with the JSON only. Copy text values exactly as the document writes them (same words and spelling, no paraphrase); write numbers as plain JSON numbers without currency signs or thousands separators, and dates as YYYY-MM-DD. Leave out, or set to null, anything the document doesn't say — never guess.",
+  "inputs": {
+    "source": {
+      "kind": "file",
+      "to": "source.txt",
+      "about": "the document to extract from",
+      "independent": true
+    },
+    "schema": {
+      "kind": "file",
+      "to": "schema.json",
+      "about": "a JSON Schema for the result (the same subset json-schema takes)",
+      "independent": true
+    },
+    "except": {
+      "kind": "text",
+      "about": "comma-separated field names whose values are derived rather than copied (checked by the schema only)",
+      "default": ""
+    }
+  },
+  "steps": [
+    "{{gatestrainer}} --check schema --schema {{schema}} out.json",
+    "{{gatestrainer}} --check grounded --file out.json --source {{source}} --except {{except}}"
+  ],
+  "plants": ["number"]
+}

@@ -21,8 +21,10 @@ const BUILT_IN: &[&str] = &[
     include_str!("../blueprints/rust-tests.json"),
     include_str!("../blueprints/python-tests.json"),
     include_str!("../blueprints/javascript-tests.json"),
+    include_str!("../blueprints/typescript-tests.json"),
     include_str!("../blueprints/json-schema.json"),
     include_str!("../blueprints/csv-table.json"),
+    include_str!("../blueprints/data-convert.json"),
     include_str!("../blueprints/math-answer.json"),
     include_str!("../blueprints/date-answer.json"),
     include_str!("../blueprints/python-refactor.json"),
@@ -32,10 +34,13 @@ const BUILT_IN: &[&str] = &[
     include_str!("../blueprints/rust-tests-for.json"),
     include_str!("../blueprints/markdown-docs.json"),
     include_str!("../blueprints/rewrite-text.json"),
+    include_str!("../blueprints/purge-term.json"),
     include_str!("../blueprints/summarize.json"),
+    include_str!("../blueprints/extract-json.json"),
     include_str!("../blueprints/cited-answer.json"),
     include_str!("../blueprints/sql-query.json"),
     include_str!("../blueprints/regex.json"),
+    include_str!("../blueprints/openscad-part.json"),
 ];
 
 /// The kinds of task a blueprint's `pick` may claim, for a router that
@@ -46,7 +51,7 @@ pub const PICK_LANGUAGES: [&str; 4] = ["rust", "python", "javascript", "none"];
 
 /// Placeholders that name a program, not an input. `gatestrainer` is this program
 /// (resolved when the gate runs); the others resolve like the presets do.
-const PROGRAMS: [&str; 4] = ["gatestrainer", "cargo", "python", "node"];
+const PROGRAMS: [&str; 5] = ["gatestrainer", "cargo", "python", "node", "openscad"];
 
 /// What a pass means (design/gates.md §2).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -251,7 +256,9 @@ impl Blueprint {
     /// What the logs call this gate: measured by the checks alone, or
     /// resting on the caller's tests.
     fn kind(&self) -> GateKind {
-        if self.steps.iter().all(|s| s.trim_start().starts_with("{{gatestrainer}} --check ")) {
+        // A render by OpenSCAD makes the artifact the checks then measure
+        // (an STL's bounding box): still a measurement of the thing itself.
+        if self.steps.iter().all(|s| s.trim_start().starts_with("{{gatestrainer}} --check ") || s.trim_start().starts_with("{{openscad}} ")) {
             GateKind::Mechanical
         } else if self.inputs.values().any(|i| i.independent) {
             GateKind::Tests
@@ -290,6 +297,7 @@ impl Blueprint {
             "cargo" => Some(bin_name(CARGO_BIN_ENV, "cargo")),
             "python" => Some(bin_name(PYTHON_BIN_ENV, if cfg!(windows) { "python" } else { "python3" })),
             "node" => Some(bin_name(NODE_BIN_ENV, "node")),
+            "openscad" => Some(bin_name(crate::config::OPENSCAD_BIN_ENV, "openscad")),
             _ => None,
         };
         let fill = |text: &str, quote: bool| -> String {
@@ -347,14 +355,15 @@ impl Blueprint {
 
     /// One line per input, for listings.
     /// The programs its gate runs besides this binary (`cargo`, `python`,
-    /// `node`), read from its steps: `{{cargo}}`, `{{python}}`, `{{node}}`,
+    /// `node`, `openscad`), read from its steps: `{{cargo}}`, `{{python}}`,
+    /// `{{node}}`, `{{openscad}}`,
     /// and the interpreter a `--engine` names (or that input's default, so
     /// regex needs python unless a task picks another engine). For the
     /// doctor: which blueprints a missing tool stops.
     pub fn tools(&self) -> Vec<&'static str> {
         let mut out = Vec::new();
         for step in &self.steps {
-            for (tool, mark) in [("cargo", "{{cargo}}"), ("python", "{{python}}"), ("node", "{{node}}")] {
+            for (tool, mark) in [("cargo", "{{cargo}}"), ("python", "{{python}}"), ("node", "{{node}}"), ("openscad", "{{openscad}}")] {
                 if step.contains(mark) && !out.contains(&tool) {
                     out.push(tool);
                 }

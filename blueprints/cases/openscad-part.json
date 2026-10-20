@@ -1,0 +1,21 @@
+{
+ "about": "A 60 × 40 × 4 mm mounting plate with four M3 holes and a 20 mm centre hole: size and volume measured on the rendered STL.",
+ "inputs": {
+  "size": "60,40,4",
+  "volume": "8214.7",
+  "vol_tol": 0.01
+ },
+ "good": [
+  "// Mounting plate: 60 x 40 x 4 mm, four M3 clearance holes 5 mm in from each corner, a 20 mm centre hole.\ndifference() {\n    cube([60, 40, 4]);\n    for (x = [5, 55], y = [5, 35])\n        translate([x, y, -1]) cylinder(d = 3.2, h = 6, $fn = 64);\n    translate([30, 20, -1]) cylinder(d = 20, h = 6, $fn = 128);\n}\n",
+  "plate = [60, 40, 4];\nhole = 3.2;\ndifference() {\n    translate([0, 0, plate[2] / 2]) cube(plate, center = true);\n    for (sx = [-1, 1], sy = [-1, 1])\n        translate([sx * 25, sy * 15, -1]) cylinder(d = hole, h = plate[2] + 2, $fn = 96);\n    translate([0, 0, -1]) cylinder(r = 10, h = plate[2] + 2, $fn = 128);\n}\n"
+ ],
+ "bad": [
+  "// Mounting plate: 60 x 40 x 4 mm, four M3 clearance holes 5 mm in from each corner, a 20 mm centre hole.\ndifference() {\n    cube([60, 40, 4]);\n    for (x = [5, 55], y = [5, 35])\n        translate([x, y, -1]) cylinder(d = 3.2, h = 6, $fn = 64);\n}\n",
+  "// Mounting plate: 60 x 40 x 4 mm, four M3 clearance holes 5 mm in from each corner, a 20 mm centre hole.\ndifference() {\n    cube([40, 60, 4]);\n    for (x = [5, 35], y = [5, 55])\n        translate([x, y, -1]) cylinder(d = 3.2, h = 6, $fn = 64);\n    translate([20, 30, -1]) cylinder(d = 20, h = 6, $fn = 128);\n}\n",
+  "// Mounting plate: 60 x 40 x 4 mm, four M3 clearance holes 5 mm in from each corner, a 20 mm centre hole.\ndifference() {\n    cube([60, 40, 3]);\n    for (x = [5, 55], y = [5, 35])\n        translate([x, y, -1]) cylinder(d = 3.2, h = 6, $fn = 64);\n    translate([30, 20, -1]) cylinder(d = 20, h = 6, $fn = 128);\n}\n",
+  "// Mounting plate: 60 x 40 x 4 mm, four M3 clearance holes 5 mm in from each corner, a 20 mm centre hole.\ndifference() {\n    cube([60, 40, 4]);\n    for (x = [5, 55], y = [5, 35])\n        translate([x, y, 1]) cylinder(d = 3.2, h = 6, $fn = 64);\n    translate([30, 20, 1]) cylinder(d = 20, h = 6, $fn = 128);\n}\n",
+  "// Mounting plate: 60 x 40 x 4 mm, four M3 clearance holes 5 mm in from each corner, a 20 mm centre hole.\ndifference() {\n    cube([60, 40, 4]);\n    for (x = [5, 55], y = [5, 35])\n        translate([x, y, -1]) cylinder(d = 3.2, h = 6, $fn = 64);\n    translate([30, 20, -1]) cylinder(r = 20, h = 6, $fn = 128);\n}\n",
+  "// Mounting plate: 60 x 40 x 4 mm, four M3 clearance holes 5 mm in from each corner, a 20 mm centre hole.\ndifference( {\n    cube([60, 40, 4]);\n    for (x = [5, 55], y = [5, 35])\n        translate([x, y, -1]) cylinder(d = 3.2, h = 6, $fn = 64);\n    translate([30, 20, -1]) cylinder(d = 20, h = 6, $fn = 128);\n}\n",
+  "// Mounting plate: 60 x 40 x 4 mm, four M3 clearance holes 5 mm in from each corner, a 20 mm centre hole.\ndifference() {\n    cube([60, 40, 4]);\n    for (x = [5, 55], y = [5, 35])\n        translate([x, y, -1]) cylinder(d = 3.2, h = 6, $fn = 64);\n    translate([30, 20, -1]) cylinder(d = 20, h = 6, $fn = 128);\n}\ntranslate([60, 0, 0]) cube([10, 10, 4]);\n{\n}\n"
+ ]
+}

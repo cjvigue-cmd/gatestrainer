@@ -1,0 +1,35 @@
+{
+  "name": "data-convert",
+  "task": "format conversion",
+  "about": "Your data — CSV, TSV, a JSON array of objects or JSON Lines — converted to another of those formats with every record and field kept: the same field names, the same values (3.50 may become 3.5 and an empty cell null or a left-out field, but 02134 stays 02134), in the same order unless you say any. Proves nothing was lost, added or changed; renaming or reshaping fields is a different task.",
+  "proves": "full",
+  "entry_file": "out.data",
+  "instructions": "Reply with the converted data only (one fenced block is fine). Keep every record, every field under its exact name, and every value as written; codes with leading zeros stay text. CSV: a header row and RFC 4180 quoting. TSV: a header row, tab-separated. JSON: one array of flat objects. JSON Lines: one object per line.",
+  "inputs": {
+    "source": {
+      "kind": "file",
+      "to": "source.data",
+      "about": "the data to convert",
+      "independent": true
+    },
+    "source_format": {
+      "kind": "text",
+      "about": "the source's format: csv, tsv, json or jsonl",
+      "default": "csv"
+    },
+    "format": {
+      "kind": "text",
+      "about": "the format wanted: csv, tsv, json or jsonl",
+      "default": "json"
+    },
+    "order": {
+      "kind": "text",
+      "about": "keep (the records in the source's order) or any",
+      "default": "keep"
+    }
+  },
+  "steps": [
+    "{{gatestrainer}} --check records --source {{source}} --source-format {{source_format}} --file out.data --format {{format}} --order {{order}}"
+  ],
+  "plants": ["number"]
+}

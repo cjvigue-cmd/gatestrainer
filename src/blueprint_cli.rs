@@ -132,14 +132,27 @@ impl Trial {
 /// 12 examples wrong") the first instance too, which is what convinces.
 fn first_line(feedback: &str) -> String {
     // Rules like unittest's "=====" say nothing: lines with words only.
-    let mut lines = feedback.lines().map(str::trim).filter(|l| l.chars().any(char::is_alphanumeric));
+    // OpenSCAD's render statistics say nothing either.
+    let stats = regex::Regex::new(r"^(?:Geometries in cache|Geometry cache size|CGAL (?:Polyhedrons in cache|cache size)|Total rendering time|Rendering Polygon Mesh|Compiling design|Parsing design|Normalized (?:CSG )?tree|(?:Top level object is a 3D object|Simple|Vertices|Halfedges|Edges|Halffacets|Facets|Volumes):)").ok();
+    let mut lines = feedback.lines().map(str::trim).filter(|l| l.chars().any(char::is_alphanumeric) && !stats.as_ref().is_some_and(|r| r.is_match(l)));
+    // Node's test runner prints passing tests (✔) and its own frames
+    // (node:internal…) before the reason: the first failing test (✖) or
+    // the error's own line says what broke.
+    let node = feedback.lines().map(str::trim_start).any(|l| l.starts_with(['✔', '✖', 'ℹ']) || l.starts_with("node:internal"));
+    let error = regex::Regex::new(r"^(?:✖ |[A-Z][A-Za-z]*Error\b)").ok();
+    if let Some(l) = feedback.lines().map(str::trim).find(|l| node && error.as_ref().is_some_and(|r| r.is_match(l))) {
+        return clip(l);
+    }
     let first = lines.next().unwrap_or("");
     let counted = regex::Regex::new(r"FAILED — \d+ of \d+ ").is_ok_and(|r| r.is_match(first));
     let line = match lines.next().filter(|_| counted) {
         Some(next) => format!("{first}; {next}"),
         None => first.to_string(),
     };
-    let line = line.as_str();
+    clip(&line)
+}
+
+fn clip(line: &str) -> String {
     if line.chars().count() > 160 {
         format!("{}…", line.chars().take(160).collect::<String>())
     } else {
@@ -173,23 +186,33 @@ const DEMO: &[(&str, &str)] = &[
     ("math-answer.json", include_str!("../blueprints/cases/math-answer.json")),
     ("date-answer.json", include_str!("../blueprints/cases/date-answer.json")),
     ("python-tests.json", include_str!("../blueprints/cases/python-tests.json")),
+    ("typescript-tests.json", include_str!("../blueprints/cases/typescript-tests.json")),
     ("python-refactor.json", include_str!("../blueprints/cases/python-refactor.json")),
     ("sql-query.json", include_str!("../blueprints/cases/sql-query.json")),
     ("regex.json", include_str!("../blueprints/cases/regex.json")),
+    ("openscad-part.json", include_str!("../blueprints/cases/openscad-part.json")),
     ("json-schema.json", include_str!("../blueprints/cases/json-schema.json")),
+    ("data-convert.json", include_str!("../blueprints/cases/data-convert.json")),
+    ("extract-json.json", include_str!("../blueprints/cases/extract-json.json")),
     ("rewrite-text.json", include_str!("../blueprints/cases/rewrite-text.json")),
+    ("purge-term.json", include_str!("../blueprints/cases/purge-term.json")),
     ("cited-answer.json", include_str!("../blueprints/cases/cited-answer.json")),
 ];
 
 const DEMO_FILES: &[(&str, &str)] = &[
     ("python-tests/test_solution.py", include_str!("../blueprints/cases/python-tests/test_solution.py")),
+    ("typescript-tests/solution.test.ts", include_str!("../blueprints/cases/typescript-tests/solution.test.ts")),
     ("python-refactor/original.py", include_str!("../blueprints/cases/python-refactor/original.py")),
     ("python-refactor/test_solution.py", include_str!("../blueprints/cases/python-refactor/test_solution.py")),
     ("python-refactor/cases.jsonl", include_str!("../blueprints/cases/python-refactor/cases.jsonl")),
     ("sql-query/data.sql", include_str!("../blueprints/cases/sql-query/data.sql")),
     ("sql-query/reference.sql", include_str!("../blueprints/cases/sql-query/reference.sql")),
     ("json-schema/schema.json", include_str!("../blueprints/cases/json-schema/schema.json")),
+    ("data-convert/products.csv", include_str!("../blueprints/cases/data-convert/products.csv")),
+    ("extract-json/invoice.txt", include_str!("../blueprints/cases/extract-json/invoice.txt")),
+    ("extract-json/schema.json", include_str!("../blueprints/cases/extract-json/schema.json")),
     ("rewrite-text/source.md", include_str!("../blueprints/cases/rewrite-text/source.md")),
+    ("purge-term/source.md", include_str!("../blueprints/cases/purge-term/source.md")),
     ("cited-answer/sources.txt", include_str!("../blueprints/cases/cited-answer/sources.txt")),
 ];
 
@@ -379,6 +402,12 @@ mod tests {
         assert!(t.ok() && t.line().contains("fails") && t.line().contains("no match"), "{}", t.line());
         assert_eq!(first_line("\n  x: FAILED — y\nmore"), "x: FAILED — y");
         assert_eq!(first_line("=====\nFAIL: test_x (t.T.test_x)\n-----"), "FAIL: test_x (t.T.test_x)");
+        assert_eq!(first_line("Geometries in cache: 1\nGeometry cache size in bytes: 0\nCGAL Polyhedrons in cache: 0\nCGAL cache size in bytes: 0\nTotal rendering time: 0:00:00.000\nCurrent top level object is empty."), "Current top level object is empty.");
+        assert_eq!(first_line("✔ plain units (0.8ms)\n✖ malformed input throws (1.2ms)\n  AssertionError [ERR_ASSERTION]: Missing expected exception"), "✖ malformed input throws (1.2ms)");
+        assert_eq!(
+            first_line("node:internal/modules/run_main:111\n    triggerUncaughtException(\n    ^\nSyntaxError [ERR_UNSUPPORTED_TYPESCRIPT_SYNTAX]: TypeScript enum is not supported in strip-only mode"),
+            "SyntaxError [ERR_UNSUPPORTED_TYPESCRIPT_SYNTAX]: TypeScript enum is not supported in strip-only mode"
+        );
         assert_eq!(first_line("regex: FAILED — 1 of 3 examples wrong (rust, whole line)\n  should match: \"a\""), "regex: FAILED — 1 of 3 examples wrong (rust, whole line); should match: \"a\"");
     }
 
@@ -398,6 +427,13 @@ mod tests {
             let name = path.file_stem().and_then(|s| s.to_str()).expect("name").to_string();
             let bp = blueprint::find(&name, None).unwrap_or_else(|e| panic!("{}: {e}", path.display()));
             if bp.steps.iter().any(|s| s.contains("{{gatestrainer}}")) {
+                continue;
+            }
+            // A blueprint whose tool this machine lacks (node for the
+            // JavaScript and TypeScript ones) is skipped, not failed.
+            let bin = |t: &'static str| if t == "python" { "python3" } else { t };
+            if let Some(t) = bp.tools().into_iter().find(|t| std::process::Command::new(bin(t)).arg("--version").output().is_err()) {
+                eprintln!("skipping {name}: {t} missing");
                 continue;
             }
             let cases = Cases::parse(&std::fs::read_to_string(&path).expect("read"), &dir).unwrap_or_else(|e| panic!("{name}: {e}"));

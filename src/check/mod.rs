@@ -12,6 +12,8 @@ mod count;
 mod csv;
 mod differential;
 mod flattery;
+mod grounded;
+mod mesh;
 pub(crate) mod mutation;
 mod numeric;
 pub(crate) mod overclaim;
@@ -22,6 +24,7 @@ pub(crate) mod date;
 pub(crate) mod secrets;
 mod preserve;
 mod quote;
+mod records;
 mod regex;
 mod resolve;
 mod schema;
@@ -97,6 +100,21 @@ gatestrainer <primitive> [options]   (exit 0 pass, 1 fail, 2 bad check)
           [--order mdy|dmy]   every date in F is real (no February 30) and its
           weekday right; with --expect, F's date (the one in P's group 1, or the
           only one) is that day; 10/08/2026 is read only with --order
+  mesh    --file F.stl --size X,Y,Z [--tol MM] [--orientation fixed|any]
+          [--volume MM3 [--vol-tol R]]   an STL (ASCII or binary) is a closed
+          solid (every edge on exactly two faces) whose bounding box is within
+          --tol (default 0.05 mm) of X,Y,Z — in that order unless any — and, with
+          --volume, whose volume is within R (default 0.01 = 1%) of MM3
+  grounded --file F --source SRC [--source …] [--except KEY,…]
+          every value in the JSON file F is in a SRC: text word for word (case,
+          curly quotes and spacing aside), numbers equal to one written there
+          (1,249.50 grounds 1249.5), YYYY-MM-DD dates written there in any form;
+          true/false/null and --except fields (derived ones) skipped
+  records --source S --file F [--source-format FMT] [--format FMT] [--order keep|any]
+          F holds the same records as S (formats csv, tsv, json = an array of
+          objects, jsonl; by extension unless given): same field names, values
+          equal as text, as numbers (3.50 = 3.5, but 02134 stays text), as
+          true/false, or both empty (empty cell, null, field left out)
   regex   --file F --match FILE --no-match FILE [--engine rust|python|javascript]
           [--mode search|full]   the pattern in F (one line) matches every --match
           line and no --no-match line (blank lines skipped), in that engine
@@ -143,6 +161,9 @@ pub fn cli(args: &[String]) -> i32 {
         "refusal" => refusal::run(rest),
         "date" => date::run(rest),
         "regex" => regex::run(rest),
+        "records" => records::run(rest),
+        "grounded" => grounded::run(rest),
+        "mesh" => mesh::run(rest),
         other => Err(format!("unknown check `{other}`\n\n{USAGE}")),
     };
     match run {

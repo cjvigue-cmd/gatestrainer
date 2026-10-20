@@ -1,0 +1,55 @@
+{
+  "name": "purge-term",
+  "task": "edit / rename / reference purge",
+  "about": "Your text (source.md) with every match of `term` removed or replaced — an old product name, a retired term, a person's name — and nothing else lost: numbers, URLs and placeholders kept, the length close to the original. For a rename, `replacement` must then appear at least `replacements` times. Proves the term is gone and those items survived, not that the prose reads well.",
+  "proves": "partial",
+  "entry_file": "out.md",
+  "instructions": "Reply with the whole revised text only. Change only what the task names; keep every other sentence, number, URL and placeholder such as {name} exactly as written.",
+  "inputs": {
+    "source": {
+      "kind": "file",
+      "to": "source.md",
+      "about": "the text to revise",
+      "independent": true
+    },
+    "term": {
+      "kind": "text",
+      "about": "a regular expression (Rust syntax) for what must be gone, e.g. (?i)\\bquill\\b — case, word boundaries and plurals are yours to say",
+      "independent": true
+    },
+    "replacement": {
+      "kind": "text",
+      "about": "for a rename: a regular expression for the new wording, e.g. (?i)\\binkwell\\b; leave empty for a plain purge",
+      "default": ""
+    },
+    "replacements": {
+      "kind": "number",
+      "about": "the fewest times `replacement` must appear in the result (for a rename: how often the old term appeared, plus the new one's own uses)",
+      "default": 0
+    },
+    "keep": {
+      "kind": "text",
+      "about": "what must survive: any of numbers, urls, code, placeholders, headings (leave out urls or code when the term is inside them)",
+      "default": "numbers,urls,placeholders"
+    },
+    "min_ratio": {
+      "kind": "number",
+      "about": "shortest allowed, in words, against the original",
+      "default": 0.8
+    },
+    "max_ratio": {
+      "kind": "number",
+      "about": "longest allowed, in words, against the original",
+      "default": 1.2
+    }
+  },
+  "steps": [
+    "{{gatestrainer}} --check count --pattern {{term}} --eq 0 out.md",
+    "{{gatestrainer}} --check count --pattern {{replacement}} --min {{replacements}} out.md",
+    "{{gatestrainer}} --check preserve --from {{source}} --to out.md --keep {{keep}}",
+    "{{gatestrainer}} --check bounds --file out.md --ratio-of {{source}} --ratio {{min_ratio}}:{{max_ratio}}",
+    "{{gatestrainer}} --check refusal --file out.md --source {{source}}",
+    "{{gatestrainer}} --check flattery --file out.md --source {{source}}"
+  ],
+  "plants": ["number"]
+}

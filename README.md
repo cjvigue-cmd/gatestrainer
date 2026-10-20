@@ -4,7 +4,7 @@
 
 A model's claim that its answer is right counts for nothing. A check that runs and exits decides. Gatestrainer is a single program with three layers:
 
-1. **Checks.** Nineteen primitive checks, each one deterministic, reading only the files it is given. `gatestrainer numeric --file answer.txt --pattern "answer: (\S+)" --expect 1157.625` exits 0 if the number is there and right, 1 if it isn't, with one problem per line on stderr written to be fed straight back to the model.
+1. **Checks.** Twenty-two primitive checks, each one deterministic, reading only the files it is given. `gatestrainer numeric --file answer.txt --pattern "answer: (\S+)" --expect 1157.625` exits 0 if the number is there and right, 1 if it isn't, with one problem per line on stderr written to be fed straight back to the model.
 2. **Gates.** A gate is files plus a command whose exit code decides, run in a fresh folder with a scrubbed environment, under a watchdog and whatever kernel isolation the OS offers (Landlock and seccomp on Linux, Job Objects on Windows, rlimits on macOS). The command comes from a model, so the gate treats it as hostile.
 3. **Blueprints and plants.** A blueprint is a gate described as JSON with named inputs, so a task names it instead of spelling a gate out. After a pass, the gate is also given a **planted false answer**, a wrong answer chosen by the program and never by the model. A gate that passes the plant is weak for that task, whatever it said about the answer.
 
@@ -15,7 +15,7 @@ cargo install --git https://github.com/cjvigue-cmd/gatestrainer   # crates.io re
 gatestrainer demo
 ```
 
-The demo puts nine built-in gates to work on answers written in advance: right ones, an empty one and near misses (a refund counted as income, `\d{2}:\d{2}` letting `24:00` through, a 1.01 kg parcel priced as 1 kg). Every near miss is caught, with the reason a model would get back, in about five seconds. No model and no network.
+The demo puts fourteen built-in gates to work on answers written in advance: right ones, an empty one and near misses (a refund counted as income, `\d{2}:\d{2}` letting `24:00` through, a 1.01 kg parcel priced as 1 kg). Every near miss is caught, with the reason a model would get back, in about fifteen seconds (the OpenSCAD part takes about five of them). No model and no network.
 
 ## The exit-code contract
 
@@ -48,6 +48,9 @@ Two kinds, and the difference is the point of this project.
 | `date` | every date is real (no 30 February), its weekday right, and the expected one when given |
 | `resolve` | relative links and anchors exist, code names exist in the named files, required mentions are present |
 | `preserve` | every number, URL, code span, placeholder or heading level in the source appears in the result at least as often |
+| `records` | two data files (CSV, TSV, a JSON array of objects, JSON Lines) hold the same records: the same field names, values equal as text, numbers (`3.50` = `3.5`, but `02134` stays `02134`), true/false or both empty, in order unless `--order any` |
+| `grounded` | every value in a JSON answer is in the source: text word for word, numbers equal to ones written there (`1,249.50` grounds `1249.5`), ISO dates written there in any form; true/false/null and `--except` fields skipped |
+| `mesh` | an STL (ASCII or binary) is a closed solid, every edge on exactly two faces, with the expected bounding box and, if given, volume |
 
 **Lints.** A pass means the text shows none of the listed symptoms. These catch phrases, not substance, and a rephrased answer slips past. They're labelled so you never mistake one for a proof.
 
@@ -60,7 +63,7 @@ Two kinds, and the difference is the point of this project.
 | `flattery` | praise of the asker, eager openers, grovelling |
 | `refusal` | deflections: "As an AI…", "I'm unable to…", "I don't have access to…" |
 
-Honest limits, so they're written down: `quote` ignores quotations under four words; `preserve` checks that a summary's numbers exist in the source, not that each is attached to the right claim; `mutation`'s operators are small (flipped comparisons, swapped and/or, booleans, integers off by one), so it catches tests that assert nothing, not tests that miss a branch; `resolve` counts web links but doesn't fetch them.
+Honest limits, so they're written down: `quote` ignores quotations under four words; `preserve` checks that a summary's numbers exist in the source, not that each is attached to the right claim; `mutation`'s operators are small (flipped comparisons, swapped and/or, booleans, integers off by one), so it catches tests that assert nothing, not tests that miss a branch; `resolve` counts web links but doesn't fetch them; `grounded` proves a value is in the source, not that it sits in the right field, and a small integer is in almost any text; `mesh` measures the envelope, closedness and volume, so a hole in the wrong place passes.
 
 `gatestrainer --help` prints every option.
 
@@ -89,7 +92,7 @@ gatestrainer blueprint list
 gatestrainer blueprint test math-answer blueprints/cases/math-answer.json
 ```
 
-Eighteen blueprints are built in: `rust-tests`, `python-tests`, `javascript-tests` (your hidden tests against the model's code), `python-refactor`, `javascript-refactor` (old and new agree on your cases), `*-tests-for` (the model's tests must kill mutants of your code), `math-answer`, `date-answer`, `sql-query`, `regex`, `json-schema`, `csv-table`, `markdown-docs`, `rewrite-text`, `summarize`, `cited-answer`. Each says what it `proves`: `full`, or `partial` when its checks are necessary conditions only. Your own go in the folder `GATESTRAINER_BLUEPRINTS` names.
+Twenty-three blueprints are built in: `rust-tests`, `python-tests`, `javascript-tests`, `typescript-tests` (your hidden tests against the model's code; TypeScript runs through Node's own type stripping, 22.18 or later, so types are erased and the tests decide), `python-refactor`, `javascript-refactor` (old and new agree on your cases), `*-tests-for` (the model's tests must kill mutants of your code), `math-answer`, `date-answer`, `sql-query`, `regex`, `json-schema`, `csv-table`, `data-convert` (CSV, TSV, JSON or JSON Lines into another of those with every record kept), `markdown-docs`, `rewrite-text`, `purge-term` (a rename or reference purge: your pattern matches nothing afterwards and nothing else is lost), `summarize`, `extract-json` (fields from your document into your schema, every value found in the document), `cited-answer`, `openscad-part` (an OpenSCAD model rendered to STL, then measured: a closed solid of your size and volume; `{{openscad}}` in a step runs OpenSCAD as a separate program). Each says what it `proves`: `full`, or `partial` when its checks are necessary conditions only. Your own go in the folder `GATESTRAINER_BLUEPRINTS` names.
 
 A blueprint's `plants` list says which false answer to try after a pass: `mutate` (the answer with one small change: a flipped comparison, a constant off by one), `number` (the last number changed), `quote` (a word inserted into the first quotation), `overclaim`, `flattery` or `date`. A caller can also supply its own `must_fail` answers. The result reports what was planted and whether the gate caught it. A missed plant doesn't fail the answer; it marks the pass as unverified, because the answer wasn't shown wrong, the gate was shown weak.
 

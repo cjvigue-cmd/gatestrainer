@@ -1,0 +1,4 @@
+sku,name,unit_price,zip,in_stock,note
+0042,"Lamp, brass",3.50,02134,true,
+0107,"Monitor 27"" IPS",219.00,10001,false,ships in 2 boxes
+0311,Café chair,45,94110,true,"back-ordered; see ""Q3"" list"

@@ -1,0 +1,22 @@
+{
+ "about": "Rename a product everywhere in release notes (word, possessive, lowercase command) and lose nothing else.",
+ "inputs": {
+  "source": {
+   "file": "purge-term/source.md"
+  },
+  "term": "(?i)\\bquill\\b",
+  "replacement": "(?i)\\binkwell\\b",
+  "replacements": 5
+ },
+ "good": [
+  "# Inkwell 0.4 release notes\n\nInkwell now starts in 2.1 seconds, down from 3.4. Run `inkwell --doctor` to check your setup, or read https://example.com/docs/setup first.\n\n- Inkwell's gate library has 23 blueprints.\n- The installer asks for {licence_key} once.\n\nThanks to the 14 testers who tried Inkwell this month.\n"
+ ],
+ "bad": [
+  "# Inkwell 0.4 release notes\n\nInkwell now starts in 2.1 seconds, down from 3.4. Run `inkwell --doctor` to check your setup, or read https://example.com/docs/setup first.\n\n- Quill's gate library has 23 blueprints.\n- The installer asks for {licence_key} once.\n\nThanks to the 14 testers who tried Inkwell this month.\n",
+  "# Inkwell 0.4 release notes\n\nInkwell now starts in 2.1 seconds, down from 3.4. Run `quill --doctor` to check your setup, or read https://example.com/docs/setup first.\n\n- Inkwell's gate library has 23 blueprints.\n- The installer asks for {licence_key} once.\n\nThanks to the 14 testers who tried Inkwell this month.\n",
+  "# Inkwell 0.4 release notes\n\nInkwell now starts in 2.1 seconds, down from 3.4. Run `inkwell --doctor` to check your setup, or read https://example.com/docs/setup first.\n\n- Inkwell's gate library has 23 blueprints.\n- The installer asks for {licence_key} once.\n\n",
+  "# Inkwell 0.4 release notes\n\nIt now starts in 2.1 seconds, down from 3.4. Run `inkwell --doctor` to check your setup, or read https://example.com/docs/setup first.\n\n- Inkwell's gate library has 23 blueprints.\n- The installer asks for {licence_key} once.\n\nThanks to the 14 testers who tried it this month.\n",
+  "# Inkwell 0.4 release notes\n\nInkwell now starts in 2.1 seconds, down from 3.4. Run `inkwell --doctor` to check your setup, or read https://example.com/docs/setup first.\n\n- Inkwell's gate library has 23 blueprints.\n- The installer asks for {license_key} once.\n\nThanks to the 14 testers who tried Inkwell this month.\n",
+  "# Inkwell 0.4 release notes\n\nInkwell now starts in 2 seconds, down from 3.4. Run `inkwell --doctor` to check your setup, or read https://example.com/docs/setup first.\n\n- Inkwell's gate library has 23 blueprints.\n- The installer asks for {licence_key} once.\n\nThanks to the 14 testers who tried Inkwell this month.\n"
+ ]
+}

@@ -1,0 +1,18 @@
+{
+ "about": "Parse a duration like 1h30m into seconds (units h, m, s, largest first; anything else throws RangeError).",
+ "inputs": {
+  "tests": {
+   "file": "typescript-tests/solution.test.ts"
+  }
+ },
+ "good": [
+  "export function parseDuration(text: string): number {\n  const m = /^(?:(\\d+)h)?(?:(\\d+)m)?(?:(\\d+)s)?$/.exec(text);\n  if (text === \"\" || m === null || (m[1] === undefined && m[2] === undefined && m[3] === undefined)) {\n    throw new RangeError(`not a duration: ${JSON.stringify(text)}`);\n  }\n  const [h, min, s] = [m[1], m[2], m[3]].map((v): number => (v === undefined ? 0 : Number(v)));\n  return h * 3600 + min * 60 + s;\n}\n"
+ ],
+ "bad": [
+  "export function parseDuration(text: string): number {\n  const m = /^(?:(\\d+)h|(\\d+)m|(\\d+)s)+$/.exec(text);\n  if (text === \"\" || m === null || (m[1] === undefined && m[2] === undefined && m[3] === undefined)) {\n    throw new RangeError(`not a duration: ${JSON.stringify(text)}`);\n  }\n  const [h, min, s] = [m[1], m[2], m[3]].map((v): number => (v === undefined ? 0 : Number(v)));\n  return h * 3600 + min * 60 + s;\n}\n",
+  "export function parseDuration(text: string): number {\n  const m = /^(?:(\\d+)h)?(?:(\\d+)m)?(?:(\\d+)s)?$/.exec(text);\n  if (text === \"\" || m === null || (m[1] === undefined && m[2] === undefined && m[3] === undefined)) {\n    throw new RangeError(`not a duration: ${JSON.stringify(text)}`);\n  }\n  const [h, min, s] = [m[1], m[2], m[3]].map((v): number => (v === undefined ? 0 : Number(v)));\n  return h * 3600 + min * 100 + s;\n}\n",
+  "export function parseDuration(text: string): number {\n  if (/^\\d+$/.test(text)) return Number(text);\n  const m = /^(?:(\\d+)h)?(?:(\\d+)m)?(?:(\\d+)s)?$/.exec(text);\n  if (text === \"\" || m === null) throw new RangeError(\"not a duration\");\n  return Number(m[1] ?? 0) * 3600 + Number(m[2] ?? 0) * 60 + Number(m[3] ?? 0);\n}\n",
+  "enum Unit { h = 3600, m = 60, s = 1 }\nexport function parseDuration(text: string): number {\n  const m = /^(?:(\\d+)h)?(?:(\\d+)m)?(?:(\\d+)s)?$/.exec(text);\n  if (text === \"\" || m === null) throw new RangeError(\"not a duration\");\n  return Number(m[1] ?? 0) * Unit.h + Number(m[2] ?? 0) * Unit.m + Number(m[3] ?? 0) * Unit.s;\n}\n",
+  "export function parseDuration(text: string): number {\n  const m = /^(?:(\\d+)h)?(?:(\\d+)m)?(?:(\\d+)s)?$/.exec(text);\n  if (text === \"\" || m === null || (m[1] === undefined && m[2] === undefined && m[3] === undefined)) {\n    throw new Error(`not a duration: ${JSON.stringify(text)}`);\n  }\n  const [h, min, s] = [m[1], m[2], m[3]].map((v): number => (v === undefined ? 0 : Number(v)));\n  return h * 3600 + min * 60 + s;\n}\n"
+ ]
+}

@@ -1,0 +1,21 @@
+{
+  "name": "typescript-tests",
+  "task": "new code / bug fix",
+  "about": "A TypeScript module (solution.ts) that passes your hidden node:test file, run by Node's own type stripping (Node 22.18 or later; no tsc, no build step). Types are erased, not checked: the tests decide. For a bug fix, the tests include one that reproduces the bug.",
+  "proves": "full",
+  "entry_file": "solution.ts",
+  "instructions": "Write solution.ts as an ES module with named exports. Use only TypeScript that erases to JavaScript: type annotations, interfaces, type aliases, generics and `as` are fine; no enum, namespace, constructor parameter properties or `import x = require(...)`. Import Node built-ins with the `node:` prefix.",
+  "inputs": {
+    "tests": {
+      "kind": "file",
+      "to": "solution.test.ts",
+      "about": "a node:test file importing './solution.ts' (with the extension); written by you, never by the model",
+      "independent": true
+    }
+  },
+  "prechecks": ["placeholder", "claims", "secrets"],
+  "steps": [
+    "{{node}} --test"
+  ],
+  "plants": ["mutate"]
+}

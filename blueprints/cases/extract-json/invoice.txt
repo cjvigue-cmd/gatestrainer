@@ -1,0 +1,15 @@
+From: billing@acmesupply.example
+Subject: Invoice INV-2026-0417
+
+Hello Dana,
+
+Please find our invoice INV-2026-0417 for the order placed on October 20, 2026.
+
+  3 x Brass desk lamp, 60 W ........ $83.30 each   $249.90
+  1 x Walnut monitor stand ......... $1,012.00
+  Shipping (2 boxes) ............... $37.60
+
+Total due: $1,299.50, payable by 11/20/2026. A 2% late fee applies after that date.
+
+Thank you,
+Acme Supply Co., 14 Harbor Road, Portland
