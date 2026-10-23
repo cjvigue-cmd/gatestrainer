@@ -107,14 +107,20 @@ fn seg(s: &str) -> String {
     s.replace('~', "~0").replace('/', "~1")
 }
 
+/// Two JSON numbers in order: whole numbers exactly (as i128, so IDs past
+/// 2^53 that an f64 can't tell apart stay apart), others as f64.
+fn order(x: &serde_json::Number, y: &serde_json::Number) -> Option<std::cmp::Ordering> {
+    let whole = |n: &serde_json::Number| n.as_i64().map(i128::from).or_else(|| n.as_u64().map(i128::from));
+    match (whole(x), whole(y)) {
+        (Some(p), Some(q)) => Some(p.cmp(&q)),
+        _ => x.as_f64()?.partial_cmp(&y.as_f64()?),
+    }
+}
+
 /// JSON equality with numbers compared by value (1 == 1.0).
 fn same(a: &Value, b: &Value) -> bool {
     match (a, b) {
-        (Value::Number(x), Value::Number(y)) => match (x.as_i64(), y.as_i64(), x.as_u64(), y.as_u64()) {
-            (Some(p), Some(q), _, _) => p == q,
-            (_, _, Some(p), Some(q)) => p == q,
-            _ => x.as_f64() == y.as_f64(),
-        },
+        (Value::Number(x), Value::Number(y)) => order(x, y) == Some(std::cmp::Ordering::Equal),
         (Value::Array(x), Value::Array(y)) => x.len() == y.len() && x.iter().zip(y).all(|(p, q)| same(p, q)),
         (Value::Object(x), Value::Object(y)) => x.len() == y.len() && x.iter().all(|(k, v)| y.get(k).is_some_and(|w| same(v, w))),
         _ => a == b,
@@ -162,19 +168,23 @@ fn walk(schema: &Value, doc: &Value, ptr: &str, c: &Checked, errors: &mut Vec<St
             err(format!("{doc} is not {k}"));
         }
     }
-    let num = |k: &str| map.get(k).and_then(Value::as_f64);
     let len = |k: &str| map.get(k).and_then(Value::as_u64).map(|n| n as usize);
-    if let Some(v) = doc.as_f64() {
-        if num("minimum").is_some_and(|m| v < m) {
+    if let Value::Number(v) = doc {
+        use std::cmp::Ordering::{Equal, Greater, Less};
+        let against = |k: &str| match map.get(k) {
+            Some(Value::Number(m)) => order(v, m),
+            _ => None,
+        };
+        if against("minimum") == Some(Less) {
             err(format!("{v} is below the minimum {}", map["minimum"]));
         }
-        if num("maximum").is_some_and(|m| v > m) {
+        if against("maximum") == Some(Greater) {
             err(format!("{v} is above the maximum {}", map["maximum"]));
         }
-        if num("exclusiveMinimum").is_some_and(|m| v <= m) {
+        if matches!(against("exclusiveMinimum"), Some(Less | Equal)) {
             err(format!("{v} must be above {}", map["exclusiveMinimum"]));
         }
-        if num("exclusiveMaximum").is_some_and(|m| v >= m) {
+        if matches!(against("exclusiveMaximum"), Some(Greater | Equal)) {
             err(format!("{v} must be below {}", map["exclusiveMaximum"]));
         }
     }
@@ -366,6 +376,15 @@ mod tests {
         assert!(!errs(s.clone(), json!(10)).is_empty());
         assert!(!errs(s, json!(0.5)).is_empty());
         assert!(errs(json!({"minimum": 1}), json!("not a number")).is_empty());
+        // Past 2^53 an f64 can't tell 2^53 from 2^53 + 1; whole numbers compare exactly.
+        let big = 9_007_199_254_740_993_u64;
+        assert!(!errs(json!({"maximum": big - 1}), json!(big)).is_empty(), "over the maximum by one");
+        assert!(!errs(json!({"exclusiveMaximum": big}), json!(big)).is_empty());
+        assert!(errs(json!({"minimum": big}), json!(big)).is_empty());
+        assert!(!errs(json!({"const": big - 1}), json!(big)).is_empty(), "const tells them apart");
+        assert!(errs(json!({"enum": [1.0]}), json!(1)).is_empty(), "1 == 1.0 still");
+        assert!(!errs(json!({"minimum": 0}), json!(-1)).is_empty());
+        assert!(errs(json!({"maximum": u64::MAX}), json!(-5)).is_empty(), "i64 against u64");
     }
     #[test]
     fn strings() {

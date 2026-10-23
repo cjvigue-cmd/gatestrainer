@@ -170,6 +170,16 @@ async fn passes(gate: &GateSpec, answer: &str) -> Result<bool, String> {
     Ok(r.passed)
 }
 
+/// Whether an automatic plant counts as caught, from its mutants' outcomes
+/// in the order they ran (`Some(passed)`, or None for one that couldn't
+/// run; the run stops at the first catch or failure to run). A mutant may
+/// be equivalent to the answer, so one caught is enough. One that couldn't
+/// run counts for nothing: with nothing else run the plant isn't counted,
+/// and after a mutant that passed it can't excuse it.
+fn mutants_caught(outcomes: &[Option<bool>]) -> bool {
+    outcomes.contains(&Some(false)) || outcomes.iter().all(Option::is_none)
+}
+
 /// Put `plan`'s false answers through `gate`, which just passed `answer`.
 /// None when there's nothing to plant. A plant that can't run (the gate
 /// itself failing to start) is noted, not counted.
@@ -191,24 +201,24 @@ pub async fn audit(gate: &GateSpec, answer: &str, plan: &Plan) -> Option<Audit> 
         None if !plan.kinds.is_empty() => note = Some(format!("no {} plant applies to this answer", plan.kinds.join(" / "))),
         None => {}
         Some((kind, list)) => {
-            // A mutant may be equivalent to the answer: missed only if two pass.
-            auto_caught = false;
+            let mut outcomes = Vec::new();
             for (text, what) in list {
                 match passes(gate, &text).await {
                     Ok(p) => {
                         planted.push(Planted { kind: kind.clone(), what, caught: !p });
+                        outcomes.push(Some(p));
                         if !p {
-                            auto_caught = true;
                             break;
                         }
                     }
                     Err(e) => {
                         note = Some(format!("{kind} plant couldn't run: {e}"));
-                        auto_caught = true;
+                        outcomes.push(None);
                         break;
                     }
                 }
             }
+            auto_caught = mutants_caught(&outcomes);
         }
     }
     let caught = auto_caught && planted.iter().filter(|p| p.kind == "must_fail").all(|p| p.caught);
@@ -344,6 +354,15 @@ pub async fn audit_recorded(dir: &Path, gate: &GateSpec, answer: &str, plan: &Pl
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_missed_mutant_isnt_excused_by_one_that_couldnt_run() {
+        assert!(mutants_caught(&[Some(false)]), "caught at once");
+        assert!(mutants_caught(&[Some(true), Some(false)]), "the first may be equivalent");
+        assert!(!mutants_caught(&[Some(true), Some(true)]), "both passed: missed");
+        assert!(mutants_caught(&[None]), "nothing ran: not counted");
+        assert!(!mutants_caught(&[Some(true), None]), "one passed, its partner never ran: missed");
+    }
 
     fn entry(model: &str, gate: &str, caught: Option<bool>) -> Entry {
         Entry { at: "t".into(), model: model.into(), gate: gate.into(), planted: caught.is_some(), caught }
