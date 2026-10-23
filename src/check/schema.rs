@@ -107,14 +107,39 @@ fn seg(s: &str) -> String {
     s.replace('~', "~0").replace('/', "~1")
 }
 
-/// Two JSON numbers in order: whole numbers exactly (as i128, so IDs past
-/// 2^53 that an f64 can't tell apart stay apart), others as f64.
+/// Two JSON numbers in order, exactly: whole numbers as i128 (IDs past 2^53
+/// that an f64 can't tell apart stay apart), a whole number against a float
+/// by the float's integer part and then its fraction, two floats as f64.
+/// A number beyond the 64-bit range is parsed as the nearest f64 (serde_json),
+/// so it is compared as that.
 fn order(x: &serde_json::Number, y: &serde_json::Number) -> Option<std::cmp::Ordering> {
     let whole = |n: &serde_json::Number| n.as_i64().map(i128::from).or_else(|| n.as_u64().map(i128::from));
     match (whole(x), whole(y)) {
         (Some(p), Some(q)) => Some(p.cmp(&q)),
-        _ => x.as_f64()?.partial_cmp(&y.as_f64()?),
+        (Some(p), None) => int_vs_float(p, y.as_f64()?),
+        (None, Some(q)) => int_vs_float(q, x.as_f64()?).map(std::cmp::Ordering::reverse),
+        (None, None) => x.as_f64()?.partial_cmp(&y.as_f64()?),
     }
+}
+
+/// `p` against `f`, exactly (an i128 cast of a float past 2^127 would saturate).
+fn int_vs_float(p: i128, f: f64) -> Option<std::cmp::Ordering> {
+    use std::cmp::Ordering::{Equal, Greater, Less};
+    const EDGE: f64 = 170_141_183_460_469_231_731_687_303_715_884_105_728.0; // 2^127
+    if f.is_nan() {
+        return None;
+    }
+    if f >= EDGE {
+        return Some(Less);
+    }
+    if f < -EDGE {
+        return Some(Greater);
+    }
+    Some(match p.cmp(&(f.trunc() as i128)) {
+        Equal if f.fract() > 0.0 => Less,
+        Equal if f.fract() < 0.0 => Greater,
+        o => o,
+    })
 }
 
 /// JSON equality with numbers compared by value (1 == 1.0).
@@ -385,6 +410,15 @@ mod tests {
         assert!(errs(json!({"enum": [1.0]}), json!(1)).is_empty(), "1 == 1.0 still");
         assert!(!errs(json!({"minimum": 0}), json!(-1)).is_empty());
         assert!(errs(json!({"maximum": u64::MAX}), json!(-5)).is_empty(), "i64 against u64");
+        // A whole number against a float bound, and the reverse (the reviewer's cases).
+        let two53 = 9_007_199_254_740_992_u64;
+        assert!(!errs(json!({"maximum": two53 as f64}), json!(two53 + 1)).is_empty());
+        assert!(!errs(json!({"const": two53 as f64}), json!(two53 + 1)).is_empty());
+        assert!(errs(json!({"exclusiveMaximum": two53 + 1}), json!(two53 as f64)).is_empty(), "below the bound");
+        assert!(!errs(json!({"maximum": 2.5}), json!(3)).is_empty() && errs(json!({"maximum": 2.5}), json!(2)).is_empty());
+        assert!(!errs(json!({"minimum": -2.5}), json!(-3)).is_empty() && errs(json!({"minimum": -2.5}), json!(-2)).is_empty());
+        assert!(!errs(json!({"maximum": u64::MAX}), json!(1e20)).is_empty(), "a float past u64");
+        assert!(errs(json!({"maximum": 1e300}), json!(u64::MAX)).is_empty() && !errs(json!({"minimum": 1e300}), json!(u64::MAX)).is_empty());
     }
     #[test]
     fn strings() {
